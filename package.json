@@ -4,10 +4,25 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
+    "build:docs": "turbo --filter docs build",
+    "build:platform": "turbo --filter platform build",
+    "build:web": "turbo --filter web build",
     "dev": "turbo dev",
+    "dev:docs": "turbo --filter docs dev",
+    "dev:platform": "turbo --filter platform dev",
+    "dev:web": "turbo --filter web dev",
     "lint": "turbo lint",
+    "lint:docs": "turbo --filter docs lint",
+    "lint:platform": "turbo --filter platform lint",
+    "lint:web": "turbo --filter web lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "format:docs": "turbo --filter docs format",
+    "format:platform": "turbo --filter platform format",
+    "format:web": "turbo --filter web format",
+    "typecheck": "turbo typecheck",
+    "typecheck:docs": "turbo --filter docs typecheck",
+    "typecheck:platform": "turbo --filter platform typecheck",
+    "typecheck:web": "turbo --filter web typecheck"
   },
   "devDependencies": {
     "@workspace/eslint-config": "*",
