@@ -1,31 +1,27 @@
-import { Geist, Geist_Mono, Inter, Raleway } from "next/font/google"
-
+import type { Metadata } from "next"
+import { Inter, Raleway } from "next/font/google"
 import "@workspace/ui/globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@workspace/ui/lib/utils";
+import { Navbar } from "@/components/layout/navbar"
 
-const ralewayHeading = Raleway({subsets:['latin'],variable:'--font-heading'});
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
+const raleway = Raleway({ subsets: ["latin"], variable: "--font-raleway" })
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'})
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
+export const metadata: Metadata = {
+  title: "Routing.com | Where Music Gets Produced",
+  description:
+    "Platform & marketplace produksi musik end-to-end di Indonesia.",
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, ralewayHeading.variable)}
-    >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+    <html lang="id" className={`${inter.variable} ${raleway.variable}`}>
+      <body className="font-sans antialiased">
+        <Navbar />
+        {children}
       </body>
     </html>
   )
