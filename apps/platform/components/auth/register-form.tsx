@@ -41,7 +41,7 @@ export function RegisterForm() {
 
   const roles = watch("roles")
   const set = <K extends keyof RegisterValues>(name: K, value: RegisterValues[K]) =>
-    setValue(name, value, { shouldValidate: isSubmitted, shouldDirty: true })
+    setValue(name, value as any, { shouldValidate: isSubmitted, shouldDirty: true })
 
   function toggleRole(role: string) {
     set("roles", roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role])
