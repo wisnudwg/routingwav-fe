@@ -2,8 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChartColumn, LayoutDashboard, List, Percent, Store } from "lucide-react"
+import { ChartColumn, LayoutDashboard, List, LogOut, Percent, Store } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
+import { clearStoredEmail } from "@/lib/auth"
+import { useRouter } from "next/navigation"
 
 const main = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -43,6 +45,7 @@ function NavLink({
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
 
   return (
     <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto border-r bg-white md:flex">
@@ -88,6 +91,17 @@ export function Sidebar() {
           Sales &amp; Orders
         </NavLink>
       </nav>
+
+      <button
+        onClick={() => {
+          clearStoredEmail()
+          router.replace("/auth/sign-in")
+        }}
+        className="mt-auto flex items-center gap-3 px-6 py-4 text-[15px] text-slate-700 hover:bg-slate-50"
+      >
+        <LogOut className="size-5 text-slate-500" aria-hidden />
+        Keluar
+      </button>
     </aside>
   )
 }
