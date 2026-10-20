@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
-import { RegisterForm } from "@/components/auth/register-form"
+import { RegisterClientForm } from "@/components/auth/register-client-form"
 
 export const metadata: Metadata = { title: "Daftar | Routing.com" }
 
 export default function RegisterPage() {
-  return <RegisterForm />
+  return <RegisterClientForm />
 }

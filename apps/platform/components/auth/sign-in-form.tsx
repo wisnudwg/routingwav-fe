@@ -78,8 +78,12 @@ export function SignInForm() {
 
       <p className="text-center text-sm text-slate-600">
         Belum punya akun?{" "}
-        <Link href="/auth/register" className="font-medium text-brand hover:underline">
-          Daftar
+        <Link href="/auth/register/talent" className="font-medium text-brand hover:underline">
+          Daftar sebagai Talent
+        </Link>
+        {" "}/{" "}
+        <Link href="/auth/register/client" className="font-medium text-brand hover:underline">
+          Daftar sebagai Client
         </Link>
       </p>
     </div>

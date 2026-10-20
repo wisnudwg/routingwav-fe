@@ -7,14 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { dialCodeOf } from "@/lib/countries"
-import { ROLE_OPTIONS, registerSchema, type RegisterValues } from "@/lib/validators"
+import { TALENT_ROLE_OPTIONS, registerTalentSchema, type RegisterTalentValues } from "@/lib/validators"
 import { CountrySelect } from "./country-select"
 import { FormField } from "./form-field"
 import { GoogleButton, OrDivider } from "./google-button"
-import { PasswordInput } from "./password-input"
+import { PasswordInput, PasswordSpecifications } from "./password-input"
 import { PhoneInput } from "./phone-input"
 
-export function RegisterForm() {
+export function RegisterTalentForm() {
   const router = useRouter()
   const {
     register,
@@ -22,8 +22,8 @@ export function RegisterForm() {
     watch,
     setValue,
     formState: { errors, isSubmitting, isSubmitted },
-  } = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
+  } = useForm<RegisterTalentValues>({
+    resolver: zodResolver(registerTalentSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -40,14 +40,14 @@ export function RegisterForm() {
   })
 
   const roles = watch("roles")
-  const set = <K extends keyof RegisterValues>(name: K, value: RegisterValues[K]) =>
+  const set = <K extends keyof RegisterTalentValues>(name: K, value: RegisterTalentValues[K]) =>
     setValue(name, value as any, { shouldValidate: isSubmitted, shouldDirty: true })
 
   function toggleRole(role: string) {
     set("roles", roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role])
   }
 
-  async function onSubmit(v: RegisterValues) {
+  async function onSubmit(v: RegisterTalentValues) {
     const payload = {
       name: v.name.trim(),
       email: v.email.trim().toLowerCase(),
@@ -66,7 +66,15 @@ export function RegisterForm() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold text-slate-900">Buat akun</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="font-heading text-3xl font-bold text-slate-900">Buat Akun Talent</h1>
+          <p className="text-md text-slate-600">
+            ({" "}Atau{" "}
+            <Link href="/auth/register/client" className="font-medium text-brand hover:underline">
+              Buat Akun Client
+            </Link>{" "})
+          </p>
+        </div>
         <p className="mt-1 text-sm text-slate-600">Bergabung dengan komunitas produksi musik Indonesia.</p>
       </div>
 
@@ -90,6 +98,7 @@ export function RegisterForm() {
             <PasswordInput id="confirm_password" autoComplete="new-password" aria-invalid={!!errors.confirm_password} {...register("confirm_password")} />
           </FormField>
         </div>
+        <PasswordSpecifications />
 
         <FormField
           label="Nomor telepon"
@@ -121,7 +130,7 @@ export function RegisterForm() {
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium text-slate-800">Peran Anda</legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            {ROLE_OPTIONS.map((role) => (
+            {TALENT_ROLE_OPTIONS.map((role) => (
               <label
                 key={role}
                 className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm has-checked:border-brand has-checked:bg-brand/5"
