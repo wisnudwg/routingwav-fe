@@ -27,13 +27,14 @@ export function ForgotPasswordForm() {
   if (sentTo) {
     return (
       <div className="space-y-4">
-        <h1 className="font-heading text-3xl font-bold text-slate-900">Cek email Anda</h1>
+        <h1 className="font-heading text-3xl font-bold text-slate-900">Password-reset link sent!</h1>
         <p className="text-sm text-slate-600">
-          Jika <span className="font-medium text-slate-900">{sentTo}</span> terdaftar, kami telah
-          mengirim tautan untuk mengatur ulang password. Tautan berlaku untuk waktu terbatas.
+          We have sent a password-reset link to <span className="font-medium text-slate-900">{sentTo}</span>.
+          Click on the link to reset your password.
+          The link expires in 10 minutes.
         </p>
         <Link href="/auth/sign-in" className="inline-block text-sm font-medium text-brand hover:underline">
-          ← Kembali ke halaman masuk
+          ← Back to sign in
         </Link>
       </div>
     )
@@ -42,9 +43,9 @@ export function ForgotPasswordForm() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold text-slate-900">Lupa password?</h1>
+        <h1 className="font-heading text-3xl font-bold text-slate-900">Forgot password?</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Masukkan email Anda dan kami akan mengirim tautan reset.
+          Enter your email and we&apos;ll send you a password-reset link.
         </p>
       </div>
 
@@ -54,18 +55,18 @@ export function ForgotPasswordForm() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="nama@email.com"
+            placeholder="email@domain.com"
             aria-invalid={!!errors.email}
             {...register("email")}
           />
         </FormField>
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          Kirim tautan reset
+          Send password-reset link
         </Button>
       </form>
 
       <Link href="/auth/sign-in" className="inline-block text-sm font-medium text-brand hover:underline">
-        ← Kembali ke halaman masuk
+        ← Back to sign in
       </Link>
     </div>
   )

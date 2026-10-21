@@ -13,7 +13,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Gets Produced.
           </p>
           <p className="mt-3 max-w-sm text-sm text-white/70">
-            Platform &amp; marketplace produksi musik end-to-end di Indonesia.
+            {/* Platform &amp; marketplace produksi musik end-to-end di Indonesia. */}
+            End-to-end music production platform & marketplace in Indonesia.
           </p>
         </div>
       </aside>

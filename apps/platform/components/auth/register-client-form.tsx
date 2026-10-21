@@ -67,22 +67,23 @@ export function RegisterClientForm() {
     <div className="space-y-6">
       <div>
         <div className="flex justify-between items-center">
-          <h1 className="font-heading text-3xl font-bold text-slate-900">Buat Akun Client</h1>
+          <h1 className="font-heading text-3xl font-bold text-slate-900">Register as Client</h1>
           <p className="text-md text-slate-600">
-            ({" "}Atau{" "}
+            ({" "}or{" "}
             <Link href="/auth/register/talent" className="font-medium text-brand hover:underline">
-              Buat Akun Talent
+              register as Talent
             </Link>{" "})
           </p>
         </div>
-        <p className="mt-1 text-sm text-slate-600">Bergabung dengan komunitas produksi musik Indonesia.</p>
+        {/* <p className="mt-1 text-sm text-slate-600">Bergabung dengan komunitas produksi musik Indonesia.</p> */}
+        <p className="mt-1 text-sm text-slate-600">Gain access to Indonesia&apos;s music production community.</p>
       </div>
 
-      <GoogleButton label="Daftar dengan Google" />
-      <OrDivider text="atau isi manual" />
+      <GoogleButton label="Register with Google" />
+      <OrDivider text="or register via the following form" />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        <FormField label="Nama" htmlFor="name" error={errors.name?.message}>
+        <FormField label="Name" htmlFor="name" error={errors.name?.message}>
           <Input id="name" autoComplete="name" aria-invalid={!!errors.name} {...register("name")} />
         </FormField>
 
@@ -94,14 +95,14 @@ export function RegisterClientForm() {
           <FormField label="Password" htmlFor="password" error={errors.password?.message}>
             <PasswordInput id="password" autoComplete="new-password" aria-invalid={!!errors.password} {...register("password")} />
           </FormField>
-          <FormField label="Konfirmasi password" htmlFor="confirm_password" error={errors.confirm_password?.message}>
+          <FormField label="Confirm Password" htmlFor="confirm_password" error={errors.confirm_password?.message}>
             <PasswordInput id="confirm_password" autoComplete="new-password" aria-invalid={!!errors.confirm_password} {...register("confirm_password")} />
           </FormField>
         </div>
         <PasswordSpecifications />
 
         <FormField
-          label="Nomor telepon"
+          label="Phone Number"
           htmlFor="phoneNumber"
           error={errors.phoneNumber?.message ?? errors.phoneCountry?.message}
         >
@@ -114,7 +115,7 @@ export function RegisterClientForm() {
           />
         </FormField>
 
-        <FormField label="Negara" htmlFor="country" error={errors.country?.message}>
+        <FormField label="Country" htmlFor="country" error={errors.country?.message}>
           <CountrySelect
             id="country"
             value={watch("country")}
@@ -123,54 +124,56 @@ export function RegisterClientForm() {
           />
         </FormField>
 
-        <FormField label="Alamat" htmlFor="address" error={errors.address?.message}>
+        <FormField label="Address" htmlFor="address" error={errors.address?.message}>
           <Input id="address" autoComplete="street-address" aria-invalid={!!errors.address} {...register("address")} />
         </FormField>
 
         <fieldset className="space-y-3">
-          <legend className="text-sm font-medium text-slate-800">Peran Anda</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {CLIENT_ROLE_OPTIONS.map((role) => (
-              <label
-                key={role}
-                className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm has-checked:border-brand has-checked:bg-brand/5"
-              >
-                <input
-                  type="checkbox"
-                  checked={roles.includes(role)}
-                  onChange={() => toggleRole(role)}
-                  className="size-4 accent-brand"
-                />
-                {role}
-              </label>
-            ))}
+          <div className="space-y-0">
+            <legend className="text-sm font-medium text-slate-800">Role</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {CLIENT_ROLE_OPTIONS.map((role) => (
+                <label
+                  key={role}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm has-checked:border-brand has-checked:bg-brand/5"
+                >
+                  <input
+                    type="checkbox"
+                    checked={roles.includes(role)}
+                    onChange={() => toggleRole(role)}
+                    className="size-4 accent-brand"
+                  />
+                  {role}
+                </label>
+              ))}
+            </div>
+            {errors.roles?.message && (
+              <p role="alert" className="text-xs text-destructive">{errors.roles.message}</p>
+            )}
           </div>
-          {errors.roles?.message && (
-            <p role="alert" className="text-xs text-destructive">{errors.roles.message}</p>
-          )}
 
           {roles.includes("Session Player") && (
-            <FormField label="Instrumen yang Anda mainkan" htmlFor="instruments" error={errors.instruments?.message}>
-              <Input id="instruments" placeholder="mis. Gitar, Bass, Drum" aria-invalid={!!errors.instruments} {...register("instruments")} />
+            <FormField label="Instruments" htmlFor="instruments" error={errors.instruments?.message}>
+              <Input id="instruments" placeholder="e.g. Guitar, Bass, Drum" aria-invalid={!!errors.instruments} {...register("instruments")} />
             </FormField>
           )}
 
           {roles.includes("Other") && (
-            <FormField label="Peran lainnya" htmlFor="otherRole" error={errors.otherRole?.message}>
-              <Input id="otherRole" placeholder="Tuliskan peran Anda" aria-invalid={!!errors.otherRole} {...register("otherRole")} />
+            <FormField label="Other Role" htmlFor="otherRole" error={errors.otherRole?.message}>
+              <Input id="otherRole" placeholder="Specify your role" aria-invalid={!!errors.otherRole} {...register("otherRole")} />
             </FormField>
           )}
         </fieldset>
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          Daftar
+          Register as Client
         </Button>
       </form>
 
       <p className="text-center text-sm text-slate-600">
-        Sudah punya akun?{" "}
+        Already have an account?{" "}
         <Link href="/auth/sign-in" className="font-medium text-brand hover:underline">
-          Masuk
+          Sign In
         </Link>
       </p>
     </div>

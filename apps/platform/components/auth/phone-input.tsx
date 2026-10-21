@@ -45,8 +45,8 @@ export function PhoneInput({
           value={country}
           onChange={onCountryChange}
           placeholder="Kode"
-          searchPlaceholder="Cari negara atau kode…"
-          emptyText="Tidak ditemukan"
+          searchPlaceholder="Find country or code…"
+          emptyText="Not found"
           panelClassName="w-80"
           invalid={invalid}
         />

@@ -27,7 +27,7 @@ export function GoogleButton({ label }: { label: string }) {
   )
 }
 
-export function OrDivider({ text = "atau" }: { text?: string }) {
+export function OrDivider({ text = "or" }: { text?: string }) {
   return (
     <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
       <span className="h-px flex-1 bg-slate-200" />

@@ -12,9 +12,9 @@ export const TALENT_ROLE_OPTIONS = [
 ] as const
 
 export const CLIENT_ROLE_OPTIONS = [
-  "Musisi / Solois",
-  "Grup / Band",
-  "Bisnis / Agency / Brand",
+  "Musician / Soloist",
+  "Group / Band",
+  "Business / Agency / Brand",
   "Other",
 ] as const
 

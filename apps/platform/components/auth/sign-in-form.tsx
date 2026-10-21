@@ -37,12 +37,12 @@ export function SignInForm() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold text-slate-900">Masuk</h1>
-        <p className="mt-1 text-sm text-slate-600">Selamat datang kembali di Routing.com.</p>
+        <h1 className="font-heading text-3xl font-bold text-slate-900">Sign In</h1>
+        <p className="mt-1 text-sm text-slate-600">Welcome back to Routing.com.</p>
       </div>
 
-      <GoogleButton label="Masuk dengan Google" />
-      <OrDivider text="atau dengan email" />
+      <GoogleButton label="Sign in with Google" />
+      <OrDivider text="or sign in with email" />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <FormField label="Email" htmlFor="email" error={errors.email?.message}>
@@ -50,7 +50,7 @@ export function SignInForm() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="nama@email.com"
+            placeholder="email@domain.com"
             aria-invalid={!!errors.email}
             {...register("email")}
           />
@@ -67,23 +67,23 @@ export function SignInForm() {
 
         <div className="text-right">
           <Link href="/auth/forgot-password" className="text-sm text-brand hover:underline">
-            Lupa password?
+            Forgot password?
           </Link>
         </div>
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          Masuk
+          Sign In
         </Button>
       </form>
 
       <p className="text-center text-sm text-slate-600">
-        Belum punya akun?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/auth/register/talent" className="font-medium text-brand hover:underline">
-          Daftar sebagai Talent
+          Register as Talent
         </Link>
         {" "}/{" "}
         <Link href="/auth/register/client" className="font-medium text-brand hover:underline">
-          Daftar sebagai Client
+          Register as Client
         </Link>
       </p>
     </div>

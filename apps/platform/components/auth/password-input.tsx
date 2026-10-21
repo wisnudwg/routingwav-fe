@@ -14,7 +14,7 @@ export function PasswordInput({ className, ...props }: React.ComponentProps<type
       <button
         type="button"
         onClick={() => setShow((s) => !s)}
-        aria-label={show ? "Sembunyikan password" : "Tampilkan password"}
+        aria-label={show ? "Hide password" : "Show password"}
         className="absolute inset-y-0 right-0 grid w-10 place-items-center text-slate-500 hover:text-slate-800"
       >
         {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

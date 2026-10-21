@@ -23,9 +23,9 @@ export function CountrySelect(props: {
   return (
     <Combobox
       options={options}
-      placeholder="Pilih negara"
-      searchPlaceholder="Cari negara…"
-      emptyText="Negara tidak ditemukan"
+      placeholder="Select a country"
+      searchPlaceholder="Search…"
+      emptyText="Country not found"
       {...props}
     />
   )
