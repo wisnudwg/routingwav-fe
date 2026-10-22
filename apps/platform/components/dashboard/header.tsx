@@ -2,6 +2,7 @@ import { Bell, Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import { Input } from "@workspace/ui/components/input"
 import { MobileNavTrigger } from "./mobile-nav-trigger"
+import { NotificationButton } from "@/components/pwa/notification-button"
 
 export function Header({ title }: { title: string }) {
   return (
@@ -17,10 +18,11 @@ export function Header({ title }: { title: string }) {
           <Input placeholder="Pencarian" className="bg-slate-50 pl-9" />
         </div>
 
-        <button className="relative" aria-label="Notifikasi">
+        {/* <button className="relative" aria-label="Notifikasi">
           <Bell className="size-5 text-slate-600" />
           <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-red-600" />
-        </button>
+        </button> */}
+        <NotificationButton />
 
         <div className="flex items-center gap-3 rounded-lg border bg-white py-1.5 pl-1.5 pr-4 shadow-sm">
           <Avatar>

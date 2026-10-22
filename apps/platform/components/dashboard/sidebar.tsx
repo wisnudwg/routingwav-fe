@@ -74,7 +74,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Percent className="size-5 text-slate-500" aria-hidden />
           Studio Manager
         </div>
-        <div className="ml-[34px] border-l pl-4">
+        <div className="ml-8.5 border-l pl-4">
           {studio.map((s) => (
             <Link
               key={s.href}
