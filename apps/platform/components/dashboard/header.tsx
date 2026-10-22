@@ -1,11 +1,15 @@
 import { Bell, Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import { Input } from "@workspace/ui/components/input"
+import { MobileNavTrigger } from "./mobile-nav-trigger"
 
 export function Header({ title }: { title: string }) {
   return (
-    <header className="flex items-center justify-between gap-4 border-b bg-white px-6 py-4 md:px-8">
-      <h1 className="font-display text-3xl text-slate-900 md:text-4xl">{title}</h1>
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b bg-white px-4 py-4 md:px-8">
+      <div className="flex min-w-0 items-center gap-3">
+        <MobileNavTrigger />
+        <h1 className="truncate font-display text-2xl text-slate-900 md:text-4xl">{title}</h1>
+      </div>
 
       <div className="flex items-center gap-4">
         <div className="relative hidden w-64 sm:block">

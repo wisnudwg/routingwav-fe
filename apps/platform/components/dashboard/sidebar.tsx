@@ -1,11 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { ChartColumn, LayoutDashboard, List, LogOut, Percent, Store } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useRef } from "react"
+import { ChartColumn, LayoutDashboard, List, LogOut, Percent, Store, X } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { clearStoredEmail } from "@/lib/auth"
-import { useRouter } from "next/navigation"
+import { useMobileNav } from "./nav-context"
 
 const main = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,15 +24,18 @@ const studio = [
 function NavLink({
   href,
   active,
+  onClick,
   children,
 }: {
   href: string
   active: boolean
+  onClick?: () => void
   children: React.ReactNode
 }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(
         "relative flex items-center gap-3 px-6 py-2.5 text-[15px] text-slate-800 hover:bg-slate-50",
         active &&
@@ -43,12 +47,13 @@ function NavLink({
   )
 }
 
-export function Sidebar() {
+/** The actual menu: shared by the desktop sidebar and the mobile drawer. */
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
   return (
-    <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto border-r bg-white md:flex">
+    <div className="flex h-full flex-col overflow-y-auto">
       <div className="px-6 py-5 leading-none">
         {/* Placeholder: swap for your real logo */}
         <span className="font-heading text-2xl font-extrabold tracking-tight text-brand">
@@ -59,7 +64,7 @@ export function Sidebar() {
 
       <nav className="mt-4 flex flex-col">
         {main.map(({ href, label, icon: Icon }) => (
-          <NavLink key={href} href={href} active={pathname === href}>
+          <NavLink key={href} href={href} active={pathname === href} onClick={onNavigate}>
             <Icon className="size-5 text-slate-500" aria-hidden />
             {label}
           </NavLink>
@@ -69,11 +74,12 @@ export function Sidebar() {
           <Percent className="size-5 text-slate-500" aria-hidden />
           Studio Manager
         </div>
-        <div className="ml-8.5 border-l pl-4">
+        <div className="ml-[34px] border-l pl-4">
           {studio.map((s) => (
             <Link
               key={s.href}
               href={s.href}
+              onClick={onNavigate}
               className="flex items-center gap-2 py-2 text-[15px] text-slate-700 hover:text-brand"
             >
               {s.label}
@@ -86,13 +92,14 @@ export function Sidebar() {
           ))}
         </div>
 
-        <NavLink href="/sales-orders" active={pathname === "/sales-orders"}>
+        <NavLink href="/sales-orders" active={pathname === "/sales-orders"} onClick={onNavigate}>
           <ChartColumn className="size-5 text-slate-500" aria-hidden />
           Sales &amp; Orders
         </NavLink>
       </nav>
 
       <button
+        type="button"
         onClick={() => {
           clearStoredEmail()
           router.replace("/auth/sign-in")
@@ -102,6 +109,69 @@ export function Sidebar() {
         <LogOut className="size-5 text-slate-500" aria-hidden />
         Keluar
       </button>
-    </aside>
+    </div>
+  )
+}
+
+function MobileSidebar() {
+  const { open, setOpen } = useMobileNav()
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const close = () => setOpen(false)
+
+  // Move focus into the drawer when it opens
+  useEffect(() => {
+    if (open) closeRef.current?.focus()
+  }, [open])
+
+  return (
+    <div className="md:hidden">
+      {/* Backdrop */}
+      <div
+        aria-hidden
+        onClick={close}
+        className={cn(
+          "fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 motion-reduce:transition-none",
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+      />
+
+      {/* Panel. `inert` keeps it unfocusable while it's off-screen. */}
+      <aside
+        id="mobile-sidebar"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu navigasi"
+        inert={!open}
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white shadow-xl transition-transform duration-300 ease-out motion-reduce:transition-none",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <button
+          ref={closeRef}
+          type="button"
+          onClick={close}
+          aria-label="Tutup menu"
+          className="absolute right-3 top-4 grid size-9 place-items-center rounded-md text-slate-600 hover:bg-slate-100"
+        >
+          <X className="size-5" />
+        </button>
+        <SidebarContent onNavigate={close} />
+      </aside>
+    </div>
+  )
+}
+
+export function Sidebar() {
+  return (
+    <>
+      {/* Desktop */}
+      <aside className="sticky top-0 hidden h-screen border-r bg-white md:block">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile */}
+      <MobileSidebar />
+    </>
   )
 }
