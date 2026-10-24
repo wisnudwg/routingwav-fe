@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { useSession } from "@/lib/auth"
+import { homeFor, useSession } from "@/lib/auth"
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -10,8 +10,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (session === null) router.replace("/auth/sign-in")
+    else if (session?.pending) router.replace(homeFor(session))
   }, [session, router])
 
-  if (!session) return null // hydrating or redirecting
+  if (!session || session.pending) return null
   return <>{children}</>
 }

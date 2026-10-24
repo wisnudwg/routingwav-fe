@@ -1,16 +1,21 @@
 import { useMemo, useSyncExternalStore } from "react"
 
+export type PendingStep = "complete-profile" | "change-password"
+
 export type Session =
-  | { type: "root"; email: string }
-  | { type: "iam"; account: string; username: string }
+  | { type: "root"; email: string; name?: string; pending?: "complete-profile" }
+  | { type: "iam"; account: string; username: string; pending?: "change-password" }
 
 const SESSION_KEY = "session"
 const ACCOUNT_KEY = "last-iam-account" // convenience only, not sensitive
 const EVENT = "auth-change"
 
-/** Stable identifier of whoever is signed in (used e.g. to key push subscriptions) */
+/** Stable identifier of whoever is signed in (e.g. to key push subscriptions) */
 export const sessionId = (s: Session) =>
   s.type === "root" ? s.email : `${s.username}@${s.account}`
+
+/** Where a session should land: its unfinished step, or the dashboard */
+export const homeFor = (s: Session) => (s.pending ? `/auth/${s.pending}` : "/sales-orders")
 
 function readRaw(): string | null {
   try {
@@ -25,10 +30,20 @@ function parse(raw: string | null): Session | null {
   try {
     const v = JSON.parse(raw)
     if (v?.type === "root" && typeof v.email === "string") {
-      return { type: "root", email: v.email }
+      return {
+        type: "root",
+        email: v.email,
+        name: typeof v.name === "string" ? v.name : undefined,
+        pending: v.pending === "complete-profile" ? "complete-profile" : undefined,
+      }
     }
     if (v?.type === "iam" && typeof v.account === "string" && typeof v.username === "string") {
-      return { type: "iam", account: v.account, username: v.username }
+      return {
+        type: "iam",
+        account: v.account,
+        username: v.username,
+        pending: v.pending === "change-password" ? "change-password" : undefined,
+      }
     }
   } catch {}
   return null

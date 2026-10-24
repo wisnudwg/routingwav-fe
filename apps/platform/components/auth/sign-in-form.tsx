@@ -1,9 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { useSession } from "@/lib/auth"
+import { useState } from "react"
 import { IamSignIn } from "./iam-sign-in"
 import { RootSignIn } from "./root-sign-in"
 import { UserTypeSwitch, type UserType } from "./user-type-switch"
@@ -15,14 +13,7 @@ export function SignInForm({
   initialType?: UserType
   initialAccount?: string
 }) {
-  const router = useRouter()
-  const session = useSession()
   const [type, setType] = useState<UserType>(initialType)
-
-  // Already signed in → skip the form
-  useEffect(() => {
-    if (session) router.replace("/sales-orders")
-  }, [session, router])
 
   return (
     <div className="space-y-6">

@@ -1,19 +1,31 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Button } from "@workspace/ui/components/button"
+import { homeFor, storeSession } from "@/lib/auth"
+import { signInWithGoogle } from "@/lib/auth-api"
 
-export function GoogleButton({ label }: { label: string }) {
+export function GoogleButton({ label, mode }: { label: string; mode: "sign-in" | "sign-up" }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
   const [note, setNote] = useState("")
+
+  async function onClick() {
+    setBusy(true)
+    setNote("")
+    // TODO: real flow. Start Google OAuth/Identity Services; the backend verifies the ID token
+    // and sets the session cookie. This only simulates it in development.
+    const result = await signInWithGoogle(mode)
+    setBusy(false)
+    if (!result.ok) return setNote(result.message)
+    storeSession(result.session)
+    router.replace(homeFor(result.session))
+  }
 
   return (
     <div className="space-y-2">
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-3"
-        onClick={() => setNote("Login Google belum terhubung ke server.")} // TODO: real OAuth
-      >
+      <Button type="button" variant="outline" className="w-full gap-3" onClick={onClick} disabled={busy}>
         <svg viewBox="0 0 48 48" className="size-5" aria-hidden>
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
           <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
@@ -23,11 +35,14 @@ export function GoogleButton({ label }: { label: string }) {
         {label}
       </Button>
       {note && <p className="text-center text-xs text-slate-500">{note}</p>}
+      {process.env.NODE_ENV !== "production" && (
+        <p className="text-center text-[11px] text-slate-400">Simulasi mode dev, belum terhubung ke Google.</p>
+      )}
     </div>
   )
 }
 
-export function OrDivider({ text = "or" }: { text?: string }) {
+export function OrDivider({ text = "atau" }: { text?: string }) {
   return (
     <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
       <span className="h-px flex-1 bg-slate-200" />

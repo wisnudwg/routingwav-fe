@@ -7,17 +7,19 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { storeSession } from "@/lib/auth"
+import { homeFor, storeSession } from "@/lib/auth"
 import { signInRoot } from "@/lib/auth-api"
 import { signInSchema, type SignInValues } from "@/lib/validators"
 import { FormField } from "./form-field"
 import { GoogleButton, OrDivider } from "./google-button"
 import { PasswordInput } from "./password-input"
+import { ResendVerification } from "./resend-verification"
 import { ServerError } from "./server-error"
 
 export function RootSignIn() {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
 
   const {
     register,
@@ -27,19 +29,26 @@ export function RootSignIn() {
 
   async function onSubmit(values: SignInValues) {
     setServerError(null)
+    setUnverifiedEmail(null)
+
     const result = await signInRoot(values.email, values.password)
-    if (!result.ok) return setServerError(result.message)
+    if (!result.ok) {
+      setServerError(result.message)
+      if (result.code === "email_unverified") setUnverifiedEmail(values.email.trim().toLowerCase())
+      return
+    }
     storeSession(result.session)
-    router.replace("/sales-orders")
+    router.replace(homeFor(result.session))
   }
 
   return (
     <div className="space-y-6">
-      <GoogleButton label="Masuk dengan Google" />
+      <GoogleButton mode="sign-in" label="Masuk dengan Google" />
       <OrDivider text="atau dengan email" />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <ServerError message={serverError} />
+        {unverifiedEmail && <ResendVerification email={unverifiedEmail} />}
 
         <FormField label="Email" htmlFor="email" error={errors.email?.message}>
           <Input

@@ -65,6 +65,10 @@ export function ForgotPasswordForm() {
         </Button>
       </form>
 
+      <p className="text-xs leading-relaxed text-slate-500">
+        Ini untuk akun pemilik. Anggota tim (IAM) tidak bisa mengatur ulang sendiri, hubungi pemilik
+        akun Anda.
+      </p>
       <Link href="/auth/sign-in" className="inline-block text-sm font-medium text-brand hover:underline">
         ← Back to sign in
       </Link>
