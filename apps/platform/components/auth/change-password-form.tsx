@@ -30,7 +30,7 @@ export function ChangePasswordForm() {
     const result = await changeIamPassword(v.password)
     if (!result.ok) return setServerError(result.message)
 
-    storeSession({ type: "iam", account: session.account, username: session.username })
+    storeSession({ type: "iam", account: session.account, username: session.username, profiles: session.profiles })
     router.replace("/sales-orders")
   }
 
