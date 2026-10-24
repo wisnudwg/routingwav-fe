@@ -1,5 +1,6 @@
 import type { Session } from "./auth"
 import type { ProfilePayload } from "./profile-payload"
+import type { ProfileKind } from "./roles"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -7,6 +8,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 // sets an httpOnly session cookie, and returns generic errors only.
 
 const TAKEN_ALIASES = new Set(["studio-abc", "routing-demo"])
+
+/** MOCK TRIGGERS: "both" in the identifier → Client + Talent (Client active), "client" → Client only */
+function mockProfiles(hint: string): ProfileKind[] {
+  const h = hint.toLowerCase()
+  if (h.includes("both")) return ["client", "talent"]
+  if (h.includes("client")) return ["client"]
+  return ["talent"]
+}
 
 export type SignInResult =
   | { ok: true; session: Session }
@@ -25,7 +34,8 @@ export async function signInRoot(email: string, password: string): Promise<SignI
       message: "Email Anda belum diverifikasi. Cek kotak masuk atau kirim ulang email verifikasi.",
     }
   }
-  return { ok: true, session: { type: "root", email: e } }
+  const profiles = mockProfiles(e)
+  return { ok: true, session: { type: "root", email: e, profiles, mode: profiles[0] } }
 }
 
 export async function signInIam(
@@ -34,17 +44,23 @@ export async function signInIam(
   password: string
 ): Promise<SignInResult> {
   await sleep(300)
-  const session: Session = {
-    type: "iam",
-    account: account.trim().toLowerCase(),
-    username: username.trim(),
-    // MOCK TRIGGER: this password simulates "temporary password, must change"
-    pending: password === "Temp1234!" ? "change-password" : undefined,
+  const acc = account.trim().toLowerCase()
+  const profiles = mockProfiles(acc) // IAM users inherit their account's profiles (permissions come later)
+  return {
+    ok: true,
+    session: {
+      type: "iam",
+      account: acc,
+      username: username.trim(),
+      profiles,
+      mode: profiles[0],
+      // MOCK TRIGGER: this password simulates "temporary password, must change"
+      pending: password === "Temp1234!" ? "change-password" : undefined,
+    },
   }
-  return { ok: true, session }
 }
 
-/** DEV-ONLY simulation. Production needs the real Google flow (see Notes). */
+/** DEV-ONLY simulation. Production needs the real Google flow. */
 export async function signInWithGoogle(mode: "sign-in" | "sign-up"): Promise<SignInResult> {
   if (process.env.NODE_ENV === "production") {
     return { ok: false, message: "Login Google belum tersedia." }
@@ -52,8 +68,20 @@ export async function signInWithGoogle(mode: "sign-in" | "sign-up"): Promise<Sig
   await sleep(300)
   const session: Session =
     mode === "sign-up"
-      ? { type: "root", email: "google.user@example.com", name: "Google User", pending: "complete-profile" }
-      : { type: "root", email: "google.user@example.com", name: "Google User" }
+      ? {
+          type: "root",
+          email: "google.user@example.com",
+          name: "Google User",
+          profiles: [], // the first profile is created on /auth/complete-profile
+          pending: "complete-profile",
+        }
+      : {
+          type: "root",
+          email: "google.user@example.com",
+          name: "Google User",
+          profiles: ["talent"],
+          mode: "talent",
+        }
   return { ok: true, session }
 }
 
@@ -68,18 +96,22 @@ export async function registerRoot(
   input: ProfilePayload & { name: string; email: string; password: string }
 ): Promise<AliasResult> {
   await sleep(500)
-  if (TAKEN_ALIASES.has(input.accountAlias)) {
+  if (TAKEN_ALIASES.has(input.account.alias)) {
     return { ok: false, message: "ID akun sudah dipakai, coba yang lain" }
   }
-  // Deliberately NO "email already exists" error. See Notes (account enumeration).
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[mock] register", { ...input, password: "***" })
+  }
+  // Deliberately NO "email already exists" error (account enumeration).
   return { ok: true }
 }
 
 export async function completeRootProfile(input: ProfilePayload): Promise<AliasResult> {
   await sleep(500)
-  if (TAKEN_ALIASES.has(input.accountAlias)) {
+  if (TAKEN_ALIASES.has(input.account.alias)) {
     return { ok: false, message: "ID akun sudah dipakai, coba yang lain" }
   }
+  if (process.env.NODE_ENV !== "production") console.log("[mock] complete profile", input)
   return { ok: true }
 }
 

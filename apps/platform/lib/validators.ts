@@ -1,16 +1,6 @@
 import { z } from "zod"
 import { ALIAS_REGEX, ALIAS_REGEX_I, RESERVED_ALIASES } from "./alias"
-
-export const ROLE_OPTIONS = [
-  "Music Producer",
-  "Music Arranger",
-  "Songwriter / Composer",
-  "Mixing Engineer",
-  "Mastering Engineer",
-  "Studio Owner / Recording Space",
-  "Session Player",
-  "Other",
-] as const
+import { OTHER_ROLE, PROFILE_KINDS, ROLES_BY_KIND, SESSION_PLAYER_ROLE, type ProfileKind } from "./roles"
 
 const emailField = z.string().trim().email("Email tidak valid")
 
@@ -51,6 +41,7 @@ export type IamSignInValues = z.infer<typeof iamSignInSchema>
 /* ---------- profile (shared by register + complete-profile) ---------- */
 
 const profileShape = {
+  kind: z.enum(PROFILE_KINDS, { error: "Pilih jenis akun" }),
   phoneCountry: z.string().min(1, "Pilih kode negara"),
   phoneNumber: z.string().regex(/^\d{6,15}$/, "Nomor telepon harus 6–15 digit"),
   country: z.string().min(1, "Pilih negara"),
@@ -62,12 +53,22 @@ const profileShape = {
 
 type Issue = { path: string; message: string }
 
-function profileIssues(v: { roles: string[]; otherRole?: string; instruments?: string }): Issue[] {
+function profileIssues(v: {
+  kind: ProfileKind
+  roles: string[]
+  otherRole?: string
+  instruments?: string
+}): Issue[] {
   const issues: Issue[] = []
-  if (v.roles.includes("Other") && !v.otherRole) {
+  const allowed = ROLES_BY_KIND[v.kind]
+
+  if (v.roles.some((r) => !allowed.includes(r))) {
+    issues.push({ path: "roles", message: "Peran tidak sesuai dengan jenis akun" })
+  }
+  if (v.roles.includes(OTHER_ROLE) && !v.otherRole) {
     issues.push({ path: "otherRole", message: "Tuliskan peran Anda" })
   }
-  if (v.roles.includes("Session Player") && !v.instruments) {
+  if (v.kind === "talent" && v.roles.includes(SESSION_PLAYER_ROLE) && !v.instruments) {
     issues.push({ path: "instruments", message: "Tuliskan instrumen Anda" })
   }
   return issues

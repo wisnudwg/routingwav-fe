@@ -10,18 +10,17 @@ import { slugifyAlias } from "@/lib/alias"
 import { registerRoot } from "@/lib/auth-api"
 import { buildProfilePayload } from "@/lib/profile-payload"
 import { registerSchema, type RegisterValues } from "@/lib/validators"
+import { AccountKindField } from "./account-kind-field"
 import { AliasField } from "./alias-field"
 import { FormField } from "./form-field"
 import { GoogleButton, OrDivider } from "./google-button"
 import { PasswordInput } from "./password-input"
 import { ProfileFields } from "./profile-fields"
 import { ResendVerification } from "./resend-verification"
-import { ServerError } from "./server-error"
 import { TermsCheckbox } from "./terms-checkbox"
 
 export function RegisterForm() {
   const [sentTo, setSentTo] = useState<string | null>(null)
-  const [serverError, setServerError] = useState<string | null>(null)
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -32,6 +31,7 @@ export function RegisterForm() {
       confirm_password: "",
       accountAlias: "",
       acceptTerms: false,
+      // `kind` is deliberately unset: the user must choose
       phoneCountry: "ID",
       phoneNumber: "",
       country: "",
@@ -51,7 +51,6 @@ export function RegisterForm() {
   } = form
 
   async function onSubmit(v: RegisterValues) {
-    setServerError(null)
     const email = v.email.trim().toLowerCase()
 
     const result = await registerRoot({
@@ -101,7 +100,7 @@ export function RegisterForm() {
 
       <FormProvider {...form}>
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-          <ServerError message={serverError} />
+          <AccountKindField />
 
           <FormField label="Nama" htmlFor="name" error={errors.name?.message}>
             <Input

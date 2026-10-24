@@ -1,15 +1,15 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { slugifyAlias } from "@/lib/alias"
-import { storeSession, useSession } from "@/lib/auth"
+import { homeFor, storeSession, useSession } from "@/lib/auth"
 import { completeRootProfile } from "@/lib/auth-api"
 import { buildProfilePayload } from "@/lib/profile-payload"
 import { completeProfileSchema, type CompleteProfileValues } from "@/lib/validators"
+import { AccountKindField } from "./account-kind-field"
 import { AliasField } from "./alias-field"
 import { ProfileFields } from "./profile-fields"
 import { TermsCheckbox } from "./terms-checkbox"
@@ -17,7 +17,6 @@ import { TermsCheckbox } from "./terms-checkbox"
 export function CompleteProfileForm() {
   const router = useRouter()
   const session = useSession()
-  const [serverError, setServerError] = useState<string | null>(null)
 
   const name = session?.type === "root" ? session.name : undefined
 
@@ -38,7 +37,6 @@ export function CompleteProfileForm() {
 
   async function onSubmit(v: CompleteProfileValues) {
     if (session?.type !== "root") return
-    setServerError(null)
 
     const result = await completeRootProfile(buildProfilePayload(v))
     if (!result.ok) {
@@ -46,9 +44,16 @@ export function CompleteProfileForm() {
       return
     }
 
-    // Profile done → drop the pending step
-    storeSession({ type: "root", email: session.email, name: session.name })
-    router.replace("/sales-orders")
+    // First profile created → drop the pending step and activate it
+    const next = {
+      type: "root" as const,
+      email: session.email,
+      name: session.name,
+      profiles: [v.kind],
+      mode: v.kind,
+    }
+    storeSession(next)
+    router.replace(homeFor(next))
   }
 
   return (
@@ -62,12 +67,9 @@ export function CompleteProfileForm() {
         </p>
       </div>
 
-      {serverError && (
-        <p role="alert" className="text-sm text-destructive">{serverError}</p>
-      )}
-
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
+          <AccountKindField />
           <AliasField />
           <ProfileFields />
           <TermsCheckbox />
