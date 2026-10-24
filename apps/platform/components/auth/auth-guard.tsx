@@ -2,16 +2,16 @@
 
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { useStoredEmail } from "@/lib/auth"
+import { useSession } from "@/lib/auth"
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const email = useStoredEmail()
+  const session = useSession()
 
   useEffect(() => {
-    if (email === null) router.replace("/auth/sign-in")
-  }, [email, router])
+    if (session === null) router.replace("/auth/sign-in")
+  }, [session, router])
 
-  if (!email) return null // hydrating or redirecting: render nothing, no flash
+  if (!session) return null // hydrating or redirecting
   return <>{children}</>
 }

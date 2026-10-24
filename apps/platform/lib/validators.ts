@@ -24,6 +24,20 @@ export const signInSchema = z.object({
 })
 export type SignInValues = z.infer<typeof signInSchema>
 
+export const iamSignInSchema = z.object({
+  account: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/i,
+      "ID akun/alias: 3–63 karakter (huruf, angka, tanda hubung)"
+    ),
+  username: z.string().trim().min(1, "Username wajib diisi").max(64, "Maksimal 64 karakter"),
+  password: z.string().min(1, "Password wajib diisi"),
+  remember: z.boolean(),
+})
+export type IamSignInValues = z.infer<typeof iamSignInSchema>
+
 export const PASSWORD_SPECIFICATIONS = [
   "Password must be at least 8 characters long",
   "Password must contain at least 1 uppercase letter",

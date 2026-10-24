@@ -1,28 +1,69 @@
-import { useSyncExternalStore } from "react"
+import { useMemo, useSyncExternalStore } from "react"
 
-const KEY = "email"
+export type Session =
+  | { type: "root"; email: string }
+  | { type: "iam"; account: string; username: string }
+
+const SESSION_KEY = "session"
+const ACCOUNT_KEY = "last-iam-account" // convenience only, not sensitive
 const EVENT = "auth-change"
 
-export function getStoredEmail(): string | null {
+/** Stable identifier of whoever is signed in (used e.g. to key push subscriptions) */
+export const sessionId = (s: Session) =>
+  s.type === "root" ? s.email : `${s.username}@${s.account}`
+
+function readRaw(): string | null {
   try {
-    return window.localStorage.getItem(KEY)
+    return window.localStorage.getItem(SESSION_KEY)
   } catch {
     return null
   }
 }
 
-export function storeEmail(email: string) {
+function parse(raw: string | null): Session | null {
+  if (!raw) return null
   try {
-    window.localStorage.setItem(KEY, email)
+    const v = JSON.parse(raw)
+    if (v?.type === "root" && typeof v.email === "string") {
+      return { type: "root", email: v.email }
+    }
+    if (v?.type === "iam" && typeof v.account === "string" && typeof v.username === "string") {
+      return { type: "iam", account: v.account, username: v.username }
+    }
+  } catch {}
+  return null
+}
+
+export const getSession = () => parse(readRaw())
+
+export function storeSession(session: Session) {
+  try {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session))
   } catch {}
   window.dispatchEvent(new Event(EVENT))
 }
 
-export function clearStoredEmail() {
+export function clearSession() {
   try {
-    window.localStorage.removeItem(KEY)
+    window.localStorage.removeItem(SESSION_KEY)
+    window.localStorage.removeItem("email") // leftover from the old email-only version
   } catch {}
   window.dispatchEvent(new Event(EVENT))
+}
+
+export function getRememberedAccount(): string | null {
+  try {
+    return window.localStorage.getItem(ACCOUNT_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function rememberAccount(account: string | null) {
+  try {
+    if (account) window.localStorage.setItem(ACCOUNT_KEY, account)
+    else window.localStorage.removeItem(ACCOUNT_KEY)
+  } catch {}
 }
 
 function subscribe(cb: () => void) {
@@ -34,7 +75,8 @@ function subscribe(cb: () => void) {
   }
 }
 
-/** undefined = server / hydrating, null = signed out, string = signed in */
-export function useStoredEmail(): string | null | undefined {
-  return useSyncExternalStore(subscribe, getStoredEmail, () => undefined)
+/** undefined = server / hydrating, null = signed out, object = signed in */
+export function useSession(): Session | null | undefined {
+  const raw = useSyncExternalStore<string | null | undefined>(subscribe, readRaw, () => undefined)
+  return useMemo(() => (raw === undefined ? undefined : parse(raw)), [raw])
 }

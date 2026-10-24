@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { ChartColumn, LayoutDashboard, List, LogOut, Percent, Store, X } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { clearStoredEmail } from "@/lib/auth"
+import { clearSession } from "@/lib/auth"
 import { useMobileNav } from "./nav-context"
 
 const main = [
@@ -101,7 +101,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <button
         type="button"
         onClick={() => {
-          clearStoredEmail()
+          clearSession()
           router.replace("/auth/sign-in")
         }}
         className="mt-auto flex items-center gap-3 px-6 py-4 text-[15px] text-slate-700 hover:bg-slate-50"

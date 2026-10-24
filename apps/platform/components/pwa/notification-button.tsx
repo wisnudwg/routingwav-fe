@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Bell, BellOff, BellRing } from "lucide-react"
-import { getStoredEmail } from "@/lib/auth"
+import { getSession, sessionId } from "@/lib/auth"
 import {
   isIOS,
   isStandalone,
@@ -44,19 +44,8 @@ export function NotificationButton() {
   }, [])
 
   async function onClick() {
-    if (status === "needs-install" || status === "blocked" || status === "unsupported") {
-      setShowHint((v) => !v)
-      return
-    }
-    setBusy(true)
-    if (status === "on") {
-      await unsubscribeFromPush()
-      setStatus("off")
-    } else {
-      const result = await subscribeToPush(getStoredEmail() ?? "")
-      setStatus(result === "ok" ? "on" : result === "denied" ? "blocked" : "off")
-    }
-    setBusy(false)
+    const session = getSession()
+    const result = await subscribeToPush(session ? sessionId(session) : "")
   }
 
   const Icon = status === "on" ? BellRing : status === "off" || status === "loading" ? Bell : BellOff
