@@ -46,7 +46,7 @@ export function ActivityLog() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-white">
-          <Table className="min-w-[40rem]">
+          <Table className="min-w-160">
             <TableHeader>
               <TableRow className="text-xs uppercase tracking-wide">
                 <TableHead className="pl-4">Waktu</TableHead>
