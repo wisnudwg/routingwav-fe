@@ -60,7 +60,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <Icon className="size-5 text-slate-500" aria-hidden />
             {item.label}
           </div>
-          <div className="ml-[34px] border-l pl-4">
+          <div className="ml-8.5 border-l pl-4">
             {item.children.map((c) => (
               <Link
                 key={c.href}
