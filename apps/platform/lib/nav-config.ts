@@ -1,5 +1,6 @@
 import {
   ChartColumn,
+  ClipboardCheck,
   FolderKanban,
   LayoutDashboard,
   List,
@@ -66,6 +67,7 @@ export const SHARED_NAV: NavItem[] = [
   { label: "Wallet", href: "/wallet", icon: Wallet, permission: "wallet:view" },
   { label: "Team", href: "/team", icon: Users, permission: "team:manage" },
   { label: "Account", href: "/account", icon: Settings, permission: "account:manage" },
+  { label: "Approvals", href: "/approvals", icon: ClipboardCheck, permission: "approvals:view" },
 ]
 
 type Flat = { href: string; permission?: Permission }

@@ -71,12 +71,24 @@ export function TeamView() {
         </div>
       </section>
 
-      <div className="flex items-center justify-between">
+      {/* <div className="flex items-center justify-between">
         <h2 className="text-xl text-slate-900">Anggota tim</h2>
         <Link href="/team/new" className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}>
           <Plus className="size-4" aria-hidden />
           Tambah anggota
         </Link>
+      </div> */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl text-slate-900">Anggota tim</h2>
+        <div className="flex gap-2">
+          <Link href="/team/delegation" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Delegasi persetujuan
+          </Link>
+          <Link href="/team/new" className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}>
+            <Plus className="size-4" aria-hidden />
+            Tambah anggota
+          </Link>
+        </div>
       </div>
 
       {members === null ? (

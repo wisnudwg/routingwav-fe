@@ -1,12 +1,13 @@
 import { readJson, writeJson } from "./mock-db"
 
 export type AuditAction =
-  | "profile_updated"
-  | "kyc_submitted"
-  | "kyc_approved"
-  | "kyc_rejected"
-  | "identity_revealed"
-  | "document_viewed"
+  | "profile_updated" | "kyc_submitted" | "kyc_approved" | "kyc_rejected"
+  | "identity_revealed" | "document_viewed"
+  | "bank_added" | "bank_removed" | "bank_revealed"
+  | "withdrawal_requested" | "withdrawal_executed"
+  | "approval_requested" | "approval_approved" | "approval_rejected" | "approval_cancelled"
+  | "delegation_saved" | "delegation_removed"
+  | "representative_set" | "representative_revoked"
 
 export const AUDIT_LABEL: Record<AuditAction, string> = {
   profile_updated: "Data akun diperbarui",
@@ -15,6 +16,19 @@ export const AUDIT_LABEL: Record<AuditAction, string> = {
   kyc_rejected: "Verifikasi identitas ditolak",
   identity_revealed: "Nomor identitas ditampilkan",
   document_viewed: "Dokumen identitas dibuka",
+  bank_added: "Rekening bank ditambahkan",
+  bank_removed: "Rekening bank dihapus",
+  bank_revealed: "Nomor rekening ditampilkan",
+  withdrawal_requested: "Penarikan saldo diajukan",
+  withdrawal_executed: "Penarikan saldo diproses",
+  approval_requested: "Permintaan persetujuan dibuat",
+  approval_approved: "Permintaan disetujui",
+  approval_rejected: "Permintaan ditolak",
+  approval_cancelled: "Permintaan dibatalkan",
+  delegation_saved: "Delegasi persetujuan disimpan",
+  delegation_removed: "Delegasi persetujuan dicabut",
+  representative_set: "Perwakilan ditunjuk",
+  representative_revoked: "Penunjukan perwakilan dicabut",
 }
 
 export type AuditEvent = {

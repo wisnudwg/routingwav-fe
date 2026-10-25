@@ -8,6 +8,7 @@ const TABS = [
   { href: "/account", label: "Profil" },
   { href: "/account/verification", label: "Verifikasi identitas" },
   { href: "/account/activity", label: "Log aktivitas" },
+  { href: "/account/representative", label: "Perwakilan" },
 ]
 
 export function AccountTabs() {

@@ -80,7 +80,7 @@ export function formatId(field: IdField, value: string) {
 
 /* ---------- documents ---------- */
 
-export type DocKind = "ktp" | "selfie" | "npwp" | "nib" | "repKtp" | "deed"
+export type DocKind = "ktp" | "selfie" | "npwp" | "nib" | "repKtp" | "deed" | "poa"
 
 export type DocSpec = {
   label: string
@@ -99,6 +99,7 @@ export const DOC_SPECS: Record<DocKind, DocSpec> = {
   nib: { label: "Dokumen NIB (OSS)", hint: "Unduhan resmi dari OSS (PDF) atau fotonya.", accept: IMAGES_PDF, maxMB: 5 },
   repKtp: { label: "KTP penanggung jawab", hint: "Semua teks terbaca, tanpa pantulan cahaya.", accept: IMAGES, maxMB: 5 },
   deed: { label: "Akta pendirian / SK pengesahan", hint: "Jika ada, mempercepat peninjauan.", accept: IMAGES_PDF, maxMB: 10 },
+  poa: { label: "Surat kuasa / SK penunjukan perwakilan", hint: "Ditandatangani pengurus badan usaha, bila perwakilan bukan pengurus.", accept: IMAGES_PDF, maxMB: 10 },
 }
 
 export const DOCS_BY_TYPE: Record<AccountType, { kind: DocKind; required: boolean }[]> = {

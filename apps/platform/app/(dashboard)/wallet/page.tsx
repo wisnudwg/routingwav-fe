@@ -1,11 +1,16 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon"
+import { PermissionGate } from "@/components/auth/permission-gate"
+import { Header } from "@/components/dashboard/header"
+import { WalletView } from "@/components/wallet/wallet-view"
 
-export default function MessagesPage() {
+export default function WalletPage() {
   return (
-    <ComingSoon
-      title="Wallet"
-      permission="wallet:view"
-      description="Wallet akan ada di sini."
-    />
+    <>
+      <Header title="Wallet" />
+      <div className="mx-auto max-w-5xl p-6 md:p-8">
+        <PermissionGate permission="wallet:view">
+          <WalletView />
+        </PermissionGate>
+      </div>
+    </>
   )
 }

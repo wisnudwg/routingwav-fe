@@ -100,8 +100,19 @@ export const CATALOG = {
     label: "Lihat Wallet", description: "Melihat saldo dan riwayat transaksi.",
   },
   "wallet:withdraw": {
-    scope: "shared", group: "Wallet", requires: ["wallet:view"], sensitive: true,
-    label: "Tarik saldo", description: "Mencairkan saldo ke rekening bank.",
+    scope: "shared", group: "Wallet", requires: ["wallet:view", "approvals:view"], sensitive: true,
+    label: "Ajukan penarikan saldo",
+    description: "Mengajukan penarikan ke rekening terdaftar. Selalu memerlukan persetujuan pemilik akun atau delegasi.",
+  },
+  "approvals:view": {
+    scope: "shared", group: "Persetujuan",
+    label: "Lihat persetujuan",
+    description: "Melihat status permintaan sendiri. Bila didelegasikan pemilik akun, juga bisa memutuskan permintaan tertentu.",
+  },
+  "contracts:sign": {
+    scope: "shared", group: "Kontrak", requires: ["approvals:view"], sensitive: true,
+    label: "Tandatangani kontrak",
+    description: "Menandatangani kontrak atas nama akun. Hanya untuk perwakilan yang ditunjuk, dan memerlukan persetujuan.",
   },
 
   /* ---------- Owner only: never grantable ---------- */
