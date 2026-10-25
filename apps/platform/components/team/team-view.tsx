@@ -90,7 +90,7 @@ export function TeamView() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-white">
-          <Table className="min-w-[44rem]">
+          <Table className="min-w-176">
             <TableHeader>
               <TableRow className="text-xs uppercase tracking-wide">
                 <TableHead className="pl-4">Anggota</TableHead>

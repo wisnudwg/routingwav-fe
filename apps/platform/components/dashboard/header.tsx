@@ -10,7 +10,7 @@ export function Header({ title }: { title: string }) {
     <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b bg-white px-4 py-4 md:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <MobileNavTrigger />
-        <h1 className="truncate font-display text-2xl text-slate-900 md:text-4xl">{title}</h1>
+        <h1 className="font-display text-2xl text-slate-900 md:text-4xl">{title}</h1>
       </div>
 
       <div className="flex items-center gap-3 md:gap-4">

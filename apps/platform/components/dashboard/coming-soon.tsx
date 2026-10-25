@@ -2,11 +2,13 @@ import type { Permission } from "@/lib/permissions"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { Header } from "./header"
 
-export const titleFromSlug = (slug: string[]) =>
-  (slug[slug.length - 1] ?? "")
+export const titleFromSlug = (slug: string) => {
+  // return (slug[slug.length - 1] ?? "")
+  return (slug ?? "")
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ") || "Halaman"
+}
 
 export function ComingSoon({
   title,
