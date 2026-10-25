@@ -13,3 +13,6 @@ export const formatDate = (iso: string) =>
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(iso))
+
+export const formatDateTime = (iso: string) =>
+  new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))

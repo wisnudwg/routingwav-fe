@@ -3,9 +3,10 @@
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@workspace/ui/lib/utils"
 import { switchMode, useSession } from "@/lib/auth"
+import { homeHref } from "@/lib/nav-config"
 import { availableModes } from "@/lib/permissions"
 import { KIND_INFO, PROFILE_KINDS, type ProfileKind } from "@/lib/roles"
-import { DASHBOARD_HOME, modeFromPath } from "@/lib/routes"
+import { modeFromPath } from "@/lib/routes"
 import { useActiveMode } from "@/lib/use-active-mode"
 
 export function ModeSwitcher({ className }: { className?: string }) {
@@ -15,13 +16,18 @@ export function ModeSwitcher({ className }: { className?: string }) {
   const active = useActiveMode()
 
   if (!session) return null
-  const modes = PROFILE_KINDS.filter((k) => availableModes(session).includes(k))
+  const s = session
+  const modes = PROFILE_KINDS.filter((k) => availableModes(s).includes(k) && homeHref(s, k) !== null)
   if (modes.length < 2) return null
 
-  function choose(next: ProfileKind) {
+  const choose = (next: ProfileKind) => {
     if (next === active) return
-    if (modeFromPath(pathname)) router.push(DASHBOARD_HOME[next]) // destination's ModeGate saves the mode
-    else switchMode(next) // shared page: stay here, the sidebar follows
+    if (modeFromPath(pathname)) {
+      const target = homeHref(s, next)
+      if (target) router.push(target) // the destination's ModeGate saves the mode
+    } else {
+      switchMode(next) // shared page: stay here, the sidebar follows
+    }
   }
 
   return (

@@ -9,7 +9,7 @@ export function NoAccessView() {
   const router = useRouter()
   const session = useSession()
 
-  const show = !!session && !session.pending && !session.mode
+  const show = !!session && !session.pending && homeFor(session) === "/no-access"
 
   useEffect(() => {
     if (session === null) router.replace("/auth/sign-in")

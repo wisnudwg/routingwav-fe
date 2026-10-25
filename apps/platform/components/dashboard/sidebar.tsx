@@ -47,8 +47,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const session = useSession()
   const mode = useActiveMode()
 
-  const items = mode ? NAV_BY_MODE[mode] : []
-  const shared = SHARED_NAV.filter((i) => !i.permission || (session && can(session, i.permission)))
+  const visible = (i: NavItem) => !i.permission || (!!session && can(session, i.permission))
+  const items = mode ? NAV_BY_MODE[mode].filter(visible) : []
+  const shared = SHARED_NAV.filter(visible)
 
   function renderItem(item: NavItem) {
     const Icon = item.icon

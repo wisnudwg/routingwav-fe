@@ -4,7 +4,7 @@ export default function MessagesPage() {
   return (
     <ComingSoon
       title="Messages"
-      permission="messages:use"
+      permission="messages:view"
       description="Chat dan pertukaran file audio (mp3/wav) akan ada di sini."
     />
   )

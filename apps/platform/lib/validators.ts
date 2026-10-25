@@ -155,3 +155,20 @@ export type AddProfileValues = z.infer<typeof addProfileSchema>
 
 export type RoleValues = Pick<ProfileValues, "kind" | "roles" | "otherRole" | "instruments">
 export type ContactValues = Pick<ProfileValues, "phoneCountry" | "phoneNumber" | "country" | "address">
+
+/* ---------- team members (IAM users) ---------- */
+
+export const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(
+    /^[a-z0-9][a-z0-9._-]{2,31}$/,
+    "3–32 karakter: huruf, angka, titik, garis bawah, atau tanda hubung (mulai dengan huruf/angka)"
+  )
+
+export const createMemberSchema = z.object({
+  username: usernameSchema,
+  displayName: z.string().trim().max(80, "Maksimal 80 karakter").optional(),
+})
+export type CreateMemberValues = z.infer<typeof createMemberSchema>

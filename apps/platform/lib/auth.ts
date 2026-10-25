@@ -1,23 +1,36 @@
 import { useMemo, useSyncExternalStore } from "react"
-import { availableModes, isPermission, type Permission } from "./permissions"
+import { homeHref } from "./nav-config"
+import {
+  availableModes,
+  limitToProfiles,
+  normalizePermissions,
+  type Permission,
+} from "./permissions"
 import { isProfileKind, type ProfileKind } from "./roles"
-import { DASHBOARD_HOME } from "./routes"
 
 export type PendingStep = "complete-profile" | "change-password"
 
 type Access = {
   /** Profiles this account has. A person can be Talent, Client, or both. */
   profiles: ProfileKind[]
-  /** The active/last-used profile. Always one of availableModes(session), if any exists. */
+  /** The active/last-used profile. */
   mode?: ProfileKind
 }
 
 export type Session =
-  | ({ type: "root"; email: string; name?: string; pending?: "complete-profile" } & Access)
+  | ({
+      type: "root"
+      email: string
+      name?: string
+      /** The account ID (alias) that team members type at sign-in */
+      alias?: string
+      pending?: "complete-profile"
+    } & Access)
   | ({
       type: "iam"
       account: string
       username: string
+      name?: string
       pending?: "change-password"
       /** Deny by default: an IAM user can only do what's listed here */
       permissions: Permission[]
@@ -32,7 +45,7 @@ export const sessionId = (s: Session) =>
   s.type === "root" ? s.email : `${s.username}@${s.account}`
 
 export const displayName = (s: Session) =>
-  s.type === "root" ? s.name?.trim() || s.email.split("@")[0] || s.email : s.username
+  s.name?.trim() || (s.type === "root" ? s.email.split("@")[0] || s.email : s.username)
 
 export const initialsOf = (name: string) =>
   name
@@ -42,9 +55,16 @@ export const initialsOf = (name: string) =>
     .map((w) => w.charAt(0).toUpperCase())
     .join("") || "?"
 
-/** Where a session should land: its unfinished step, its dashboard, or the no-access page */
-export const homeFor = (s: Session) =>
-  s.pending ? `/auth/${s.pending}` : s.mode ? DASHBOARD_HOME[s.mode] : "/no-access"
+/** Where a session should land: its unfinished step, its first allowed page, or /no-access */
+export function homeFor(s: Session): string {
+  if (s.pending) return `/auth/${s.pending}`
+  const modes = [s.mode, ...availableModes(s)].filter((m): m is ProfileKind => !!m)
+  for (const m of modes) {
+    const href = homeHref(s, m)
+    if (href) return href
+  }
+  return "/no-access"
+}
 
 function readRaw(): string | null {
   try {
@@ -65,7 +85,8 @@ function parseProfiles(v: Record<string, unknown>, pending: boolean): ProfileKin
 
 function pickMode(s: Session, raw: unknown): ProfileKind | undefined {
   const modes = availableModes(s)
-  return isProfileKind(raw) && modes.includes(raw) ? raw : modes[0]
+  if (isProfileKind(raw) && modes.includes(raw)) return raw
+  return modes.find((m) => homeHref(s, m) !== null) ?? modes[0]
 }
 
 function parse(raw: string | null): Session | null {
@@ -80,6 +101,7 @@ function parse(raw: string | null): Session | null {
         type: "root",
         email: v.email,
         name: typeof v.name === "string" ? v.name : undefined,
+        alias: typeof v.alias === "string" ? v.alias : undefined,
         pending,
         profiles: parseProfiles(v, !!pending),
       }
@@ -89,15 +111,18 @@ function parse(raw: string | null): Session | null {
 
     if (v.type === "iam" && typeof v.account === "string" && typeof v.username === "string") {
       const pending = v.pending === "change-password" ? ("change-password" as const) : undefined
+      const profiles = parseProfiles(v, !!pending)
       const iam: Session = {
         type: "iam",
         account: v.account,
         username: v.username,
+        name: typeof v.name === "string" ? v.name : undefined,
         pending,
-        profiles: parseProfiles(v, !!pending),
-        permissions: Array.isArray(v.permissions)
-          ? Array.from(new Set((v.permissions as unknown[]).filter(isPermission)))
-          : [],
+        profiles,
+        permissions: limitToProfiles(
+          normalizePermissions(Array.isArray(v.permissions) ? v.permissions : []),
+          profiles
+        ),
       }
       iam.mode = pickMode(iam, v.mode)
       return iam

@@ -49,6 +49,7 @@ export function CompleteProfileForm() {
       type: "root" as const,
       email: session.email,
       name: session.name,
+      alias: v.accountAlias,
       profiles: [v.kind],
       mode: v.kind,
     }

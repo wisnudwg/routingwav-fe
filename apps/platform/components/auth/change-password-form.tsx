@@ -27,7 +27,7 @@ export function ChangePasswordForm() {
     if (session?.type !== "iam") return
     setServerError(null)
 
-    const result = await changeIamPassword(v.password)
+    const result = await changeIamPassword(session.account, session.username, v.password)
     if (!result.ok) return setServerError(result.message)
 
     const next = { ...session, pending: undefined }

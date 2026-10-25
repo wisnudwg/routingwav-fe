@@ -1,11 +1,16 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon"
+import { PermissionGate } from "@/components/auth/permission-gate"
+import { Header } from "@/components/dashboard/header"
+import { TeamView } from "@/components/team/team-view"
 
 export default function TeamPage() {
   return (
-    <ComingSoon
-      title="Team"
-      permission="team:manage"
-      description="Pemilik akun akan membuat anggota tim (IAM) dan mengatur izin akses per profil di sini."
-    />
+    <>
+      <Header title="Team" />
+      <div className="mx-auto max-w-5xl p-6 md:p-8">
+        <PermissionGate permission="team:manage">
+          <TeamView />
+        </PermissionGate>
+      </div>
+    </>
   )
 }
