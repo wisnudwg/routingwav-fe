@@ -172,3 +172,11 @@ export const createMemberSchema = z.object({
   displayName: z.string().trim().max(80, "Maksimal 80 karakter").optional(),
 })
 export type CreateMemberValues = z.infer<typeof createMemberSchema>
+
+/* ---------- account profile (signed-in owner) ---------- */
+
+export const accountProfileSchema = z.object({
+  name: z.string().trim().min(2, "Nama minimal 2 karakter"),
+  ...contactShape,
+})
+export type AccountProfileValues = z.infer<typeof accountProfileSchema>

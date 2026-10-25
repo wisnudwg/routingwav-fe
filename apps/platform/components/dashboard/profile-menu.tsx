@@ -10,11 +10,15 @@ import { can } from "@/lib/permissions"
 import { KIND_INFO, PROFILE_KINDS } from "@/lib/roles"
 import { useActiveMode } from "@/lib/use-active-mode"
 import { ModeSwitcher } from "./mode-switcher"
+import { Settings } from "lucide-react"
+import { StatusBadge } from "@/components/account/status-badge"
+import { useKycStatus } from "@/lib/use-kyc-status"
 
 export function ProfileMenu() {
   const router = useRouter()
   const session = useSession()
   const active = useActiveMode()
+  const kyc = useKycStatus()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -69,6 +73,11 @@ export function ProfileMenu() {
           <div className="px-3 py-2">
             <p className="truncate font-medium text-slate-900">{name}</p>
             <p className="truncate text-xs text-slate-500">{identity}</p>
+            {kyc && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+              Identitas: <StatusBadge status={kyc} />
+            </p>
+          )}
           </div>
 
           {/* Mobile only: the header version is hidden below md */}
@@ -85,6 +94,18 @@ export function ProfileMenu() {
             >
               <Plus className="size-4" aria-hidden />
               Tambah profil {KIND_INFO[missing].title}
+            </Link>
+          )}
+
+          {can(session, "account:manage") && (
+            <Link
+              href="/account"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            >
+              <Settings className="size-4" aria-hidden />
+              Pengaturan akun
             </Link>
           )}
 

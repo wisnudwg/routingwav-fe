@@ -113,6 +113,16 @@ export const CATALOG = {
     scope: "shared", group: "Akun", rootOnly: true,
     label: "Kelola akun", description: "Profil, pengaturan akun, dan verifikasi identitas.",
   },
+  "identity:reveal": {
+    scope: "shared", group: "Identitas", rootOnly: true, sensitive: true,
+    label: "Lihat data identitas",
+    description: "Menampilkan nomor dan dokumen KTP/NIB/NPWP. Hanya pemilik akun, dan selalu dicatat.",
+  },
+  "activity:view": {
+    scope: "shared", group: "Akun", rootOnly: true,
+    label: "Lihat log aktivitas",
+    description: "Melihat riwayat akses dan perubahan data sensitif.",
+  },
 } as const satisfies Record<string, PermissionDef>
 
 export type Permission = keyof typeof CATALOG

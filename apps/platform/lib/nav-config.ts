@@ -7,6 +7,7 @@ import {
   Percent,
   ReceiptText,
   Search,
+  Settings,
   Store,
   Users,
   Wallet,
@@ -64,6 +65,7 @@ export const SHARED_NAV: NavItem[] = [
   { label: "Messages", href: "/messages", icon: MessageSquare, permission: "messages:view" },
   { label: "Wallet", href: "/wallet", icon: Wallet, permission: "wallet:view" },
   { label: "Team", href: "/team", icon: Users, permission: "team:manage" },
+  { label: "Account", href: "/account", icon: Settings, permission: "account:manage" },
 ]
 
 type Flat = { href: string; permission?: Permission }
