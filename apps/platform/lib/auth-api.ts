@@ -1,6 +1,7 @@
 import type { Session } from "./auth"
 import type { ProfilePayload } from "./profile-payload"
 import type { ProfileKind } from "./roles"
+import { availableModes, type Permission } from "./permissions"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -38,26 +39,33 @@ export async function signInRoot(email: string, password: string): Promise<SignI
   return { ok: true, session: { type: "root", email: e, profiles, mode: profiles[0] } }
 }
 
+/** MOCK TRIGGERS by username. Real permissions come from the server. */
+function mockIamPermissions(username: string): Permission[] {
+  const u = username.toLowerCase()
+  if (u.includes("noaccess")) return []
+  if (u.includes("talentonly")) return ["mode:talent", "messages:use"]
+  if (u.includes("clientonly")) return ["mode:client", "messages:use"]
+  return ["mode:talent", "mode:client", "messages:use", "wallet:view"]
+}
+
+
 export async function signInIam(
   account: string,
   username: string,
   password: string
 ): Promise<SignInResult> {
   await sleep(300)
-  const acc = account.trim().toLowerCase()
-  const profiles = mockProfiles(acc) // IAM users inherit their account's profiles (permissions come later)
-  return {
-    ok: true,
-    session: {
-      type: "iam",
-      account: acc,
-      username: username.trim(),
-      profiles,
-      mode: profiles[0],
-      // MOCK TRIGGER: this password simulates "temporary password, must change"
-      pending: password === "Temp1234!" ? "change-password" : undefined,
-    },
+  const session: Session = {
+    type: "iam",
+    account: account.trim().toLowerCase(),
+    username: username.trim(),
+    profiles: mockProfiles(account), // the account's profiles
+    permissions: mockIamPermissions(username), // what THIS user may do
+    // MOCK TRIGGER: this password simulates "temporary password, must change"
+    pending: password === "Temp1234!" ? "change-password" : undefined,
   }
+  session.mode = availableModes(session)[0] // first mode they're actually allowed into
+  return { ok: true, session }
 }
 
 /** DEV-ONLY simulation. Production needs the real Google flow. */
@@ -132,5 +140,12 @@ export async function verifyEmail(token: string): Promise<VerifyResult> {
 export async function changeIamPassword(newPassword: string): Promise<AliasResult> {
   void newPassword
   await sleep(400)
+  return { ok: true }
+}
+
+export async function addProfile(input: ProfilePayload["profile"]): Promise<AliasResult> {
+  await sleep(500)
+  // TODO: POST to the API. The server must reject a duplicate kind and require account:manage.
+  if (process.env.NODE_ENV !== "production") console.log("[mock] add profile", input)
   return { ok: true }
 }

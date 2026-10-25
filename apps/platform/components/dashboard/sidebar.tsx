@@ -3,23 +3,16 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
-import { ChartColumn, LayoutDashboard, List, LogOut, Percent, Store, X } from "lucide-react"
+import { LogOut, X } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { clearSession } from "@/lib/auth"
+import { clearSession, useSession } from "@/lib/auth"
+import { NAV_BY_MODE, SHARED_NAV, type NavItem } from "@/lib/nav-config"
+import { can } from "@/lib/permissions"
+import { useActiveMode } from "@/lib/use-active-mode"
 import { useMobileNav } from "./nav-context"
 
-const main = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/products", label: "All Products", icon: List },
-  { href: "/store-builder", label: "Store Builder", icon: Store },
-]
-
-const studio = [
-  { href: "/studio/action-needed", label: "Action Needed (1)", alert: true },
-  { href: "/studio/responded", label: "Responded" },
-  { href: "/studio/upcoming", label: "Upcoming (4)" },
-  { href: "/studio/completed", label: "Completed (7)" },
-]
+const isActive = (pathname: string, href: string) =>
+  pathname === href || pathname.startsWith(`${href}/`)
 
 function NavLink({
   href,
@@ -51,6 +44,53 @@ function NavLink({
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+  const session = useSession()
+  const mode = useActiveMode()
+
+  const items = mode ? NAV_BY_MODE[mode] : []
+  const shared = SHARED_NAV.filter((i) => !i.permission || (session && can(session, i.permission)))
+
+  function renderItem(item: NavItem) {
+    const Icon = item.icon
+
+    if ("children" in item) {
+      return (
+        <div key={item.label}>
+          <div className="flex items-center gap-3 px-6 py-2.5 text-[15px] text-slate-800">
+            <Icon className="size-5 text-slate-500" aria-hidden />
+            {item.label}
+          </div>
+          <div className="ml-[34px] border-l pl-4">
+            {item.children.map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center gap-2 py-2 text-[15px] text-slate-700 hover:text-brand",
+                  isActive(pathname, c.href) && "font-medium text-brand"
+                )}
+              >
+                {c.label}
+                {c.alert && (
+                  <span className="grid size-5 place-items-center rounded-full bg-brand text-[11px] font-medium text-white">
+                    {c.alert}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <NavLink key={item.href} href={item.href} active={isActive(pathname, item.href)} onClick={onNavigate}>
+        <Icon className="size-5 text-slate-500" aria-hidden />
+        {item.label}
+      </NavLink>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -63,39 +103,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="mt-4 flex flex-col">
-        {main.map(({ href, label, icon: Icon }) => (
-          <NavLink key={href} href={href} active={pathname === href} onClick={onNavigate}>
-            <Icon className="size-5 text-slate-500" aria-hidden />
-            {label}
-          </NavLink>
-        ))}
-
-        <div className="flex items-center gap-3 px-6 py-2.5 text-[15px] text-slate-800">
-          <Percent className="size-5 text-slate-500" aria-hidden />
-          Studio Manager
-        </div>
-        <div className="ml-8.5 border-l pl-4">
-          {studio.map((s) => (
-            <Link
-              key={s.href}
-              href={s.href}
-              onClick={onNavigate}
-              className="flex items-center gap-2 py-2 text-[15px] text-slate-700 hover:text-brand"
-            >
-              {s.label}
-              {s.alert && (
-                <span className="grid size-5 place-items-center rounded-full bg-brand text-[11px] font-medium text-white">
-                  1
-                </span>
-              )}
-            </Link>
-          ))}
-        </div>
-
-        <NavLink href="/sales-orders" active={pathname === "/sales-orders"} onClick={onNavigate}>
-          <ChartColumn className="size-5 text-slate-500" aria-hidden />
-          Sales &amp; Orders
-        </NavLink>
+        {items.map(renderItem)}
+        {shared.length > 0 && <div className="mx-6 my-3 border-t" />}
+        {shared.map(renderItem)}
       </nav>
 
       <button

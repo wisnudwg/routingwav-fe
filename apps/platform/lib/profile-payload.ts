@@ -1,5 +1,18 @@
 import { dialCodeOf } from "./countries"
-import type { ProfileValues } from "./validators"
+import { OTHER_ROLE, SESSION_PLAYER_ROLE } from "./roles"
+import type { ProfileValues, RoleValues } from "./validators"
+
+export function buildProfile(v: RoleValues) {
+  return {
+    kind: v.kind,
+    roles: v.roles,
+    otherRole: v.roles.includes(OTHER_ROLE) ? v.otherRole?.trim() : undefined,
+    instruments:
+      v.kind === "talent" && v.roles.includes(SESSION_PLAYER_ROLE)
+        ? v.instruments?.trim()
+        : undefined,
+  }
+}
 
 export function buildProfilePayload(v: ProfileValues & { accountAlias: string }) {
   return {
@@ -11,13 +24,7 @@ export function buildProfilePayload(v: ProfileValues & { accountAlias: string })
       address: v.address.trim(),
     },
     // The first profile ("hat") of the account
-    profile: {
-      kind: v.kind,
-      roles: v.roles,
-      otherRole: v.roles.includes("Other") ? v.otherRole?.trim() : undefined,
-      instruments:
-        v.kind === "talent" && v.roles.includes("Session Player") ? v.instruments?.trim() : undefined,
-    },
+    profile: buildProfile(v),
   }
 }
 export type ProfilePayload = ReturnType<typeof buildProfilePayload>

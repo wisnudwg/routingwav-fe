@@ -40,16 +40,21 @@ export type IamSignInValues = z.infer<typeof iamSignInSchema>
 
 /* ---------- profile (shared by register + complete-profile) ---------- */
 
-const profileShape = {
-  kind: z.enum(PROFILE_KINDS, { error: "Pilih jenis akun" }),
+const contactShape = {
   phoneCountry: z.string().min(1, "Pilih kode negara"),
   phoneNumber: z.string().regex(/^\d{6,15}$/, "Nomor telepon harus 6–15 digit"),
   country: z.string().min(1, "Pilih negara"),
   address: z.string().trim().min(5, "Alamat terlalu pendek"),
+}
+
+const roleShape = {
+  kind: z.enum(PROFILE_KINDS, { error: "Pilih jenis akun" }),
   roles: z.array(z.string()).min(1, "Pilih minimal satu peran"),
   otherRole: z.string().trim().optional(),
   instruments: z.string().trim().optional(),
 }
+
+const profileShape = { ...contactShape, ...roleShape }
 
 type Issue = { path: string; message: string }
 
@@ -138,3 +143,15 @@ export type NewPasswordValues = z.infer<typeof newPasswordSchema>
 export const resetPasswordSchema = newPasswordSchema
 export const changePasswordSchema = newPasswordSchema
 export type ResetPasswordValues = NewPasswordValues
+
+/* ---------- add another profile (signed-in owner) ---------- */
+
+export const addProfileSchema = z.object(roleShape).superRefine((v, ctx) => {
+  for (const i of profileIssues(v)) {
+    ctx.addIssue({ code: "custom", path: [i.path], message: i.message })
+  }
+})
+export type AddProfileValues = z.infer<typeof addProfileSchema>
+
+export type RoleValues = Pick<ProfileValues, "kind" | "roles" | "otherRole" | "instruments">
+export type ContactValues = Pick<ProfileValues, "phoneCountry" | "phoneNumber" | "country" | "address">

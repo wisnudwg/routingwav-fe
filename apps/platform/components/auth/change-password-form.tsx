@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
-import { clearSession, storeSession, useSession } from "@/lib/auth"
+import { clearSession, homeFor, storeSession, useSession } from "@/lib/auth"
 import { changeIamPassword } from "@/lib/auth-api"
 import { changePasswordSchema, type NewPasswordValues } from "@/lib/validators"
 import { FormField } from "./form-field"
@@ -30,8 +30,9 @@ export function ChangePasswordForm() {
     const result = await changeIamPassword(v.password)
     if (!result.ok) return setServerError(result.message)
 
-    storeSession({ type: "iam", account: session.account, username: session.username, profiles: session.profiles })
-    router.replace("/sales-orders")
+    const next = { ...session, pending: undefined }
+    storeSession(next)
+    router.replace(homeFor(next))
   }
 
   function cancel() {

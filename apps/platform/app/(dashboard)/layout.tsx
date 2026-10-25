@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/dashboard/sidebar"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthGuard mode="talent">
+    <AuthGuard>
       <MobileNavProvider>
         <div className="min-h-screen md:grid md:grid-cols-[15.5rem_1fr]">
           <Sidebar />
