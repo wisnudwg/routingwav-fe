@@ -54,13 +54,19 @@ export const ID_LABEL: Record<IdField, string> = {
 
 export const digitsOnly = (s: string, max: number) => s.replace(/\D/g, "").slice(0, max)
 
-/** Structure check only. A provider confirms against the population registry. */
-export function isPlausibleNik(nik: string) {
-  if (!/^\d{16}$/.test(nik) || nik.startsWith("00")) return false
-  const day = Number(nik.slice(6, 8)) // women: +40
-  const month = Number(nik.slice(8, 10))
-  const d = day > 40 ? day - 40 : day
-  return d >= 1 && d <= 31 && month >= 1 && month <= 12
+/** Hard rule: exactly 16 digits. The population registry check belongs to your verification provider. */
+export const isValidNikFormat = (nik: string) => /^\d{16}$/.test(nik)
+
+/**
+ * Soft check only. Digits 7–12 are normally DDMMYY (day + 40 for women), but some real NIKs
+ * don't follow it, so this must never block a submission.
+ */
+export function nikLooksUnusual(nik: string) {
+  if (!isValidNikFormat(nik)) return false
+  const dd = Number(nik.slice(6, 8))
+  const mm = Number(nik.slice(8, 10))
+  const day = dd > 40 ? dd - 40 : dd
+  return day < 1 || day > 31 || mm < 1 || mm > 12
 }
 
 /** Shows only the last 4 digits, grouped: "•••• •••• •••• 3456" */
@@ -153,7 +159,7 @@ export const kycSchema = z
 
     if (v.type === "individual") {
       if (v.fullName.length < 2) bad("fullName", "Isi nama sesuai KTP")
-      if (!isPlausibleNik(v.nik)) bad("nik", "NIK tidak valid (16 digit)")
+      if (!isValidNikFormat(v.nik)) bad("nik", "NIK tidak valid (16 digit)")
       if (v.npwp && !/^\d{15,16}$/.test(v.npwp)) bad("npwp", "NPWP harus 15 atau 16 digit")
     } else {
       if (!(ENTITY_TYPES as readonly string[]).includes(v.entityType)) bad("entityType", "Pilih jenis badan usaha")
@@ -161,7 +167,7 @@ export const kycSchema = z
       if (!/^\d{13}$/.test(v.nib)) bad("nib", "NIB harus 13 digit")
       if (!/^\d{15,16}$/.test(v.npwp)) bad("npwp", "NPWP harus 15 atau 16 digit")
       if (v.repName.length < 2) bad("repName", "Isi nama penanggung jawab")
-      if (!isPlausibleNik(v.repNik)) bad("repNik", "NIK tidak valid (16 digit)")
+      if (!isValidNikFormat(v.repNik)) bad("repNik", "NIK tidak valid (16 digit)")
     }
   })
 export type KycFormValues = z.infer<typeof kycSchema>

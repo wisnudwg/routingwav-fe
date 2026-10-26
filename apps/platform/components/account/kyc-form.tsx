@@ -25,8 +25,17 @@ import {
 import { submitKyc } from "@/lib/kyc-api"
 import { DocumentInput } from "./document-input"
 import { MockNotice } from "./mock-notice"
+import { nikLooksUnusual } from "@/lib/kyc"
 
 type DigitField = "nik" | "npwp" | "nib" | "repNik"
+
+function nikHint(value: string) {
+  if (value.length === 0) return "16 digit sesuai KTP"
+  if (value.length < 16) return `${value.length}/16 digit`
+  return nikLooksUnusual(value)
+    ? "Tanggal lahir pada NIK ini tidak lazim. Pastikan sudah sesuai KTP Anda."
+    : "✓ 16 digit"
+}
 
 export function KycForm({
   alias,
@@ -147,7 +156,7 @@ export function KycForm({
           <FormField label="Nama sesuai KTP" htmlFor="fullName" error={errors.fullName?.message}>
             <Input id="fullName" autoComplete="off" aria-invalid={!!errors.fullName} {...register("fullName")} />
           </FormField>
-          <FormField label="NIK (16 digit)" htmlFor="nik" error={errors.nik?.message}>
+          <FormField label="NIK (16 digit)" htmlFor="nik" error={errors.nik?.message} hint={nikHint(watch("nik"))}>
             <Input id="nik" aria-invalid={!!errors.nik} {...digits("nik", 16)} />
           </FormField>
           <FormField
@@ -194,7 +203,7 @@ export function KycForm({
           <FormField label="Nama sesuai KTP" htmlFor="repName" error={errors.repName?.message}>
             <Input id="repName" autoComplete="off" aria-invalid={!!errors.repName} {...register("repName")} />
           </FormField>
-          <FormField label="NIK (16 digit)" htmlFor="repNik" error={errors.repNik?.message}>
+          <FormField label="NIK (16 digit)" htmlFor="repNik" error={errors.repNik?.message} hint={nikHint(watch("nik"))}>
             <Input id="repNik" aria-invalid={!!errors.repNik} {...digits("repNik", 16)} />
           </FormField>
         </section>
