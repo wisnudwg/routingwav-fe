@@ -6,6 +6,7 @@ import { grant, revoke } from "./permissions"
 import type { ProfileKind } from "./roles"
 import type { ApiResult, Owner } from "./team-api"
 import { teamStore } from "./team-store"
+import { representativeChanged } from "./notify-events"
 
 export type Representative = {
   kind: ProfileKind
@@ -74,6 +75,7 @@ export async function designateRepresentative(
   if (previous && previous.username !== m.username) releaseSigning(owner.alias, previous.username, next)
 
   logEvent(owner.alias, actorLabel, "representative_set", `${input.kind === "talent" ? "Talent" : "Client"}: ${m.username} (berlaku ${input.since})`)
+  representativeChanged(owner.alias, input.kind, m.username, "set")
   return { ok: true, data: undefined }
 }
 
@@ -88,5 +90,6 @@ export async function revokeRepresentative(owner: Owner, actorLabel: string, kin
   releaseSigning(owner.alias, target.username, next)
 
   logEvent(owner.alias, actorLabel, "representative_revoked", `${kind === "talent" ? "Talent" : "Client"}: ${target.username}`)
+  representativeChanged(owner.alias, kind, target.username, "revoked")
   return { ok: true, data: undefined }
 }

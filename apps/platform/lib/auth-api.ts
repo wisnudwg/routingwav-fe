@@ -9,6 +9,7 @@ import {
 import type { ProfilePayload } from "./profile-payload"
 import type { ProfileKind } from "./roles"
 import { teamStore } from "./team-store"
+import { notificationsStore } from "./notifications-store"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -71,6 +72,7 @@ export async function signInRoot(email: string, password: string): Promise<SignI
   }
   const profiles = mockProfiles(e)
   const alias = mockAlias(e)
+  notificationsStore.setOwnerEmail(alias, e)
   teamStore.setProfiles(alias, profiles) // so IAM sign-in knows this account
   return { ok: true, session: { type: "root", email: e, alias, profiles, mode: profiles[0] } }
 }
@@ -141,6 +143,7 @@ export async function signInWithGoogle(mode: "sign-in" | "sign-up"): Promise<Sig
     }
   }
   teamStore.setProfiles("google-user", ["talent"])
+  notificationsStore.setOwnerEmail("google-user", "google.user@example.com")
   return {
     ok: true,
     session: {

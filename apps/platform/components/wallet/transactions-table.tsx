@@ -20,7 +20,7 @@ export function TransactionsTable({ txs }: { txs: WalletTx[] }) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-white">
-          <Table className="min-w-xl">
+          <Table className="min-w-160">
             <TableHeader>
               <TableRow className="text-xs uppercase tracking-wide">
                 <TableHead className="pl-4">Waktu</TableHead>
@@ -32,13 +32,30 @@ export function TransactionsTable({ txs }: { txs: WalletTx[] }) {
             <TableBody>
               {txs.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell className="whitespace-nowrap py-3 pl-4 text-sm text-slate-700">{formatDateTime(t.at)}</TableCell>
-                  <TableCell className="text-sm text-slate-900">{t.description}</TableCell>
-                  <TableCell className={cn("whitespace-nowrap text-right text-sm font-medium", t.amount < 0 ? "text-slate-900" : "text-green-700")}>
+                  <TableCell className="whitespace-nowrap py-3 pl-4 text-sm text-slate-700">
+                    {formatDateTime(t.at)}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-900">
+                    {t.description}
+                    {t.type === "withdrawal" && t.fee !== undefined && t.net !== undefined && (
+                      <span className="block text-xs text-slate-500">
+                        Biaya {formatIDR(t.fee)} · diterima {formatIDR(t.net)}
+                        {t.status === "processing" && t.settleAt && ` · estimasi masuk ${formatDateTime(t.settleAt)}`}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "whitespace-nowrap text-right text-sm font-medium",
+                      t.amount < 0 ? "text-slate-900" : "text-green-700"
+                    )}
+                  >
                     {t.amount > 0 && "+"}
                     {formatIDR(t.amount)}
                   </TableCell>
-                  <TableCell className="pr-4 text-sm text-slate-600">{t.status === "completed" ? "Selesai" : "Diproses"}</TableCell>
+                  <TableCell className="pr-4 text-sm text-slate-600">
+                    {t.status === "completed" ? "Selesai" : "Diproses"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

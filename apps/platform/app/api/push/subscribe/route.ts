@@ -3,16 +3,13 @@ import type { PushSubscription } from "web-push"
 import { subscriptions } from "@/lib/push-server"
 
 export async function POST(req: Request) {
-  const { email, subscription } = (await req.json()) as {
-    email?: string
-    subscription?: PushSubscription
-  }
-  if (!email || !subscription?.endpoint || !subscription.keys) {
+  const { key, subscription } = (await req.json()) as { key?: string; subscription?: PushSubscription }
+  if (!key || !subscription?.endpoint || !subscription.keys) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })
   }
-  // TODO: authenticate the request and use the session's user id, not a client-sent email
-  const list = (subscriptions.get(email) ?? []).filter((s) => s.endpoint !== subscription.endpoint)
-  subscriptions.set(email, [...list, subscription])
+  // TODO: authenticate the request and derive the key from the session, never from the body
+  const list = (subscriptions.get(key) ?? []).filter((s) => s.endpoint !== subscription.endpoint)
+  subscriptions.set(key, [...list, subscription])
   return NextResponse.json({ ok: true })
 }
 

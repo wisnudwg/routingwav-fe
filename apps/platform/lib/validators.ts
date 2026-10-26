@@ -158,6 +158,8 @@ export type ContactValues = Pick<ProfileValues, "phoneCountry" | "phoneNumber" |
 
 /* ---------- team members (IAM users) ---------- */
 
+export const RESERVED_USERNAMES = new Set(["owner", "root", "admin", "system"])
+
 export const usernameSchema = z
   .string()
   .trim()
@@ -166,6 +168,7 @@ export const usernameSchema = z
     /^[a-z0-9][a-z0-9._-]{2,31}$/,
     "3–32 karakter: huruf, angka, titik, garis bawah, atau tanda hubung (mulai dengan huruf/angka)"
   )
+  .refine((v) => !RESERVED_USERNAMES.has(v), "Username ini tidak tersedia")
 
 export const createMemberSchema = z.object({
   username: usernameSchema,

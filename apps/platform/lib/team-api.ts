@@ -3,6 +3,7 @@ import { limitToProfiles, normalizePermissions, type Permission } from "./permis
 import type { ProfileKind } from "./roles"
 import type { TeamMember } from "./team"
 import { teamStore, type MockMember } from "./team-store"
+import { RESERVED_USERNAMES } from "./validators"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -49,6 +50,9 @@ export async function createTeamMember(
   teamStore.setProfiles(owner.alias, owner.profiles)
 
   const username = input.username.trim().toLowerCase()
+
+  if (RESERVED_USERNAMES.has(username)) return { ok: false, message: "Username ini tidak tersedia" }
+  
   if (teamStore.find(owner.alias, username)) {
     return { ok: false, message: "Username sudah dipakai di akun ini" }
   }

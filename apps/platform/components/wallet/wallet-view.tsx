@@ -2,15 +2,16 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import type { BankSummary } from "@/lib/bank"
+import { Button } from "@workspace/ui/components/button"
 import { APPROVALS_EVENT } from "@/lib/approvals-store"
+import type { BankSummary } from "@/lib/bank"
 import { useSession } from "@/lib/auth"
 import { formatIDR } from "@/lib/format"
 import { getKycStatus, getKycSummary, KYC_EVENT } from "@/lib/kyc-api"
 import { can } from "@/lib/permissions"
 import { useActor } from "@/lib/use-actor"
-import type { WalletSummary } from "@/lib/wallet"
-import { getWallet, listBankAccounts } from "@/lib/wallet-api"
+import { MIN_WITHDRAWAL, PAYOUT_HOURS, WITHDRAWAL_FEE_BPS, type WalletSummary } from "@/lib/wallet"
+import { devAddFunds, devSettleWithdrawals, getWallet, listBankAccounts } from "@/lib/wallet-api"
 import { WALLET_EVENT } from "@/lib/wallet-store"
 import { BankAccounts } from "./bank-accounts"
 import { TransactionsTable } from "./transactions-table"
@@ -68,6 +69,7 @@ export function WalletView() {
 
   const { wallet, banks, verified, verifiedName } = data
   const isOwner = actor.kind === "root"
+  const processing = wallet.txs.some((t) => t.status === "processing")
 
   return (
     <div className="space-y-6">
@@ -77,6 +79,12 @@ export function WalletView() {
         <Stat label="Total saldo" value={formatIDR(wallet.balance)} />
       </div>
 
+      <p className="text-xs leading-relaxed text-slate-600">
+        Biaya penarikan {WITHDRAWAL_FEE_BPS / 100}% · minimal {formatIDR(MIN_WITHDRAWAL)} · dana masuk dalam 1×
+        {PAYOUT_HOURS} jam · batas harian {formatIDR(wallet.dailyLimit)} (terpakai {formatIDR(wallet.dailyUsed)}, sisa{" "}
+        {formatIDR(wallet.dailyRemaining)}).
+      </p>
+
       {can(session, "wallet:withdraw") && (
         <section className="space-y-4 rounded-lg border bg-white p-4 md:p-6">
           <h2 className="font-medium text-slate-900">{isOwner ? "Tarik saldo" : "Ajukan penarikan saldo"}</h2>
@@ -84,7 +92,7 @@ export function WalletView() {
           {notice && (
             <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
               {notice === "executed" ? (
-                "Penarikan berhasil diproses."
+                `Penarikan diproses. Dana masuk ke rekening dalam 1×${PAYOUT_HOURS} jam.`
               ) : (
                 <>
                   Permintaan penarikan dikirim dan menunggu persetujuan.{" "}
@@ -98,6 +106,7 @@ export function WalletView() {
             actor={actor}
             banks={banks}
             available={wallet.available}
+            dailyRemaining={wallet.dailyRemaining}
             verified={verified}
             onDone={setNotice}
           />
@@ -114,6 +123,20 @@ export function WalletView() {
       />
 
       <TransactionsTable txs={wallet.txs} />
+
+      {process.env.NODE_ENV !== "production" && isOwner && (
+        <div className="space-y-2 rounded-md border border-dashed p-3">
+          <p className="text-xs text-slate-600">Dev: uji batas harian dan status pencairan</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => devAddFunds(actor, 30_000_000)}>
+              Tambah saldo Rp 30.000.000
+            </Button>
+            <Button size="sm" variant="outline" disabled={!processing} onClick={() => devSettleWithdrawals(actor)}>
+              Selesaikan pencairan yang diproses
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -15,6 +15,7 @@ import {
 } from "./kyc"
 import { readJson, writeJson } from "./mock-db"
 import type { ApiResult } from "./team-api"
+import { kycDecided } from "./notify-events"
 
 // DEV ONLY. This stores full identity numbers in localStorage so the UI can be exercised.
 // A real backend stores them encrypted, returns them only via the reveal endpoint, and
@@ -167,5 +168,6 @@ export async function simulateDecision(
       : { ...rec, status: "rejected", decidedAt, rejectionReason: "Foto dokumen tidak terbaca jelas. Unggah ulang dengan pencahayaan yang lebih baik." }
   )
   logEvent(alias, "Sistem verifikasi (simulasi)", decision === "verified" ? "kyc_approved" : "kyc_rejected")
+  kycDecided(alias, decision)
   return { ok: true, data: undefined }
 }

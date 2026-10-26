@@ -6,9 +6,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  const { email, title, body, url, tag } = await req.json()
+  const { key, title, body, url, tag } = await req.json()
   const webpush = getWebPush()
-  const list = subscriptions.get(email) ?? []
+  const list = subscriptions.get(key) ?? []
   const payload = JSON.stringify({ title, body, url, tag })
 
   const results = await Promise.all(
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         const status = (err as { statusCode?: number }).statusCode
         if (status === 404 || status === 410) {
           // subscription is dead, so remove it
-          subscriptions.set(email, (subscriptions.get(email) ?? []).filter((s) => s.endpoint !== sub.endpoint))
+          subscriptions.set(key, (subscriptions.get(key) ?? []).filter((s) => s.endpoint !== sub.endpoint))
         }
         return { endpoint: sub.endpoint, ok: false, status }
       }

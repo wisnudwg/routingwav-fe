@@ -19,3 +19,15 @@ export const formatDateTime = (iso: string) =>
 
 export const formatBytes = (n: number) =>
   n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`
+
+const rtf = new Intl.RelativeTimeFormat("id", { numeric: "auto" })
+
+export function formatRelative(iso: string, now = Date.now()) {
+  const s = Math.round((new Date(iso).getTime() - now) / 1000)
+  const abs = Math.abs(s)
+  if (abs < 60) return "baru saja"
+  if (abs < 3600) return rtf.format(Math.round(s / 60), "minute")
+  if (abs < 86_400) return rtf.format(Math.round(s / 3600), "hour")
+  if (abs < 7 * 86_400) return rtf.format(Math.round(s / 86_400), "day")
+  return formatDateTime(iso)
+}

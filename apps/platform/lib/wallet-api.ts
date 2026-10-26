@@ -1,12 +1,19 @@
-import { approvalsStore } from "./approvals-store"
 import type { Actor, ApprovalRequest } from "./approvals"
+import { approvalsStore } from "./approvals-store"
 import { logEvent } from "./audit"
 import { BANKS, maskBank, normalizeHolder, type BankSummary } from "./bank"
 import { formatIDR } from "./format"
 import { getKycSummary } from "./kyc-api"
+import { bankChanged, approvalRequested, withdrawalProcessed, withdrawalSettled } from "./notify-events"
 import type { ApiResult } from "./team-api"
 import { teamStore } from "./team-store"
-import { MIN_WITHDRAWAL, type WalletSummary } from "./wallet"
+import {
+  DAILY_WITHDRAWAL_LIMIT,
+  MIN_WITHDRAWAL,
+  feeFor,
+  jakartaDay,
+  type WalletSummary,
+} from "./wallet"
 import { walletStore, type BankRec } from "./wallet-store"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -32,14 +39,32 @@ const heldOf = (alias: string) =>
     .filter((r) => r.status === "pending" && r.type === "withdrawal")
     .reduce((sum, r) => sum + (r.amount ?? 0), 0)
 
+/** Processed withdrawals today + requests still waiting (all counted at the gross amount) */
+function withdrawnToday(alias: string) {
+  const today = jakartaDay(Date.now())
+  const done = walletStore
+    .wallet(alias)
+    .txs.filter((t) => t.type === "withdrawal" && jakartaDay(t.at) === today)
+    .reduce((sum, t) => sum - t.amount, 0)
+  const pending = approvalsStore
+    .requests(alias)
+    .filter((r) => r.type === "withdrawal" && r.status === "pending" && jakartaDay(r.requestedAt) === today)
+    .reduce((sum, r) => sum + (r.amount ?? 0), 0)
+  return done + pending
+}
+
 export async function getWallet(alias: string): Promise<WalletSummary> {
   await sleep(200)
   const w = walletStore.wallet(alias)
   const held = heldOf(alias)
+  const used = withdrawnToday(alias)
   return {
     balance: w.balance,
     held,
     available: w.balance - held,
+    dailyLimit: DAILY_WITHDRAWAL_LIMIT,
+    dailyUsed: used,
+    dailyRemaining: Math.max(DAILY_WITHDRAWAL_LIMIT - used, 0),
     txs: [...w.txs].sort((a, b) => b.at.localeCompare(a.at)),
   }
 }
@@ -82,6 +107,7 @@ export async function addBankAccount(
   }
   walletStore.addBank(rec)
   logEvent(actor.alias, actor.label, "bank_added", destLabel(rec))
+  bankChanged(actor.alias, "added", destLabel(rec), "owner")
   return { ok: true, data: toSummary(rec) }
 }
 
@@ -100,6 +126,7 @@ export async function removeBankAccount(actor: Actor, id: string): Promise<ApiRe
 
   walletStore.removeBank(actor.alias, id)
   logEvent(actor.alias, actor.label, "bank_removed", destLabel(bank))
+  bankChanged(actor.alias, "removed", destLabel(bank), "owner")
   return { ok: true, data: undefined }
 }
 
@@ -114,12 +141,21 @@ export async function revealBankNumber(actor: Actor, id: string): Promise<ApiRes
   return { ok: true, data: bank.number }
 }
 
-/** Shared by direct owner withdrawals and approved requests */
-export function executeWithdrawal(alias: string, bankAccountId: string, amount: number): ApiResult<{ txId: string }> {
+/** Shared by direct owner withdrawals and approved requests. The fee is the one fixed at request time. */
+export function executeWithdrawal(
+  alias: string,
+  bankAccountId: string,
+  amount: number,
+  fee: number = feeFor(amount)
+): ApiResult<{ txId: string; fee: number; net: number; bankLabel: string }> {
   const bank = walletStore.bank(alias, bankAccountId)
   if (!bank) return { ok: false, message: "Rekening tujuan sudah dihapus." }
-  const res = walletStore.debit(alias, amount, `Penarikan ke ${destLabel(bank)}`)
-  return res.ok ? { ok: true, data: { txId: res.tx.id } } : res
+
+  const label = destLabel(bank)
+  const res = walletStore.debit(alias, amount, fee, `Penarikan ke ${label}`)
+  return res.ok
+    ? { ok: true, data: { txId: res.tx.id, fee, net: amount - fee, bankLabel: label } }
+    : res
 }
 
 export async function requestWithdrawal(
@@ -150,12 +186,25 @@ export async function requestWithdrawal(
     return { ok: false, message: "Saldo tersedia tidak cukup." }
   }
 
-  const detail = `${formatIDR(amount)} → ${destLabel(bank)}`
+  const used = withdrawnToday(actor.alias)
+  if (used + amount > DAILY_WITHDRAWAL_LIMIT) {
+    const left = Math.max(DAILY_WITHDRAWAL_LIMIT - used, 0)
+    return {
+      ok: false,
+      message: `Melebihi batas penarikan harian ${formatIDR(DAILY_WITHDRAWAL_LIMIT)}. Sisa hari ini: ${formatIDR(left)}.`,
+    }
+  }
+
+  const fee = feeFor(amount)
+  const net = amount - fee
+  const label = destLabel(bank)
+  const detail = `${formatIDR(amount)} (biaya ${formatIDR(fee)}) → ${label}`
 
   if (actor.kind === "root") {
-    const res = executeWithdrawal(actor.alias, bank.id, amount)
+    const res = executeWithdrawal(actor.alias, bank.id, amount, fee)
     if (!res.ok) return res
     logEvent(actor.alias, actor.label, "withdrawal_executed", detail)
+    withdrawalProcessed({ account: actor.alias, fee, net, bankLabel: label, by: "owner" })
     return { ok: true, data: { mode: "executed" } }
   }
 
@@ -164,14 +213,33 @@ export async function requestWithdrawal(
     account: actor.alias,
     type: "withdrawal",
     status: "pending",
-    summary: `Tarik ${formatIDR(amount)} ke ${destLabel(bank)}`,
+    summary: `Tarik ${formatIDR(amount)} ke ${label} (diterima ${formatIDR(net)} setelah biaya ${formatIDR(fee)})`,
     amount,
-    payload: { bankAccountId: bank.id },
+    payload: { bankAccountId: bank.id, fee, net }, // locked now: the approver sees exactly what will execute
     requestedBy: actor.username,
     requestedByLabel: actor.label,
     requestedAt: new Date().toISOString(),
   }
   approvalsStore.insert(req)
   logEvent(actor.alias, actor.label, "withdrawal_requested", detail)
+  approvalRequested(req)
   return { ok: true, data: { mode: "pending" } }
+}
+
+/** DEV ONLY */
+export async function devAddFunds(actor: Actor, amount: number): Promise<ApiResult> {
+  await sleep(200)
+  if (isProd() || actor.kind !== "root") return { ok: false, message: NOT_AVAILABLE }
+  walletStore.credit(actor.alias, amount, "Saldo uji coba (dev)")
+  return { ok: true, data: undefined }
+}
+
+/** DEV ONLY: stands in for the payout provider confirming the transfer */
+export async function devSettleWithdrawals(actor: Actor): Promise<ApiResult> {
+  await sleep(300)
+  if (isProd() || actor.kind !== "root") return { ok: false, message: NOT_AVAILABLE }
+  for (const t of walletStore.settleProcessing(actor.alias)) {
+    withdrawalSettled(actor.alias, t.net ?? -t.amount, t.description.replace("Penarikan ke ", ""))
+  }
+  return { ok: true, data: undefined }
 }

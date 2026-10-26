@@ -10,7 +10,7 @@ import { can } from "@/lib/permissions"
 import { KIND_INFO, PROFILE_KINDS } from "@/lib/roles"
 import { useActiveMode } from "@/lib/use-active-mode"
 import { ModeSwitcher } from "./mode-switcher"
-import { Settings } from "lucide-react"
+import { Bell, Settings } from "lucide-react"
 import { StatusBadge } from "@/components/account/status-badge"
 import { useKycStatus } from "@/lib/use-kyc-status"
 
@@ -96,6 +96,16 @@ export function ProfileMenu() {
               Tambah profil {KIND_INFO[missing].title}
             </Link>
           )}
+
+          <Link
+            href="/settings/notifications"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+          >
+            <Bell className="size-4" aria-hidden />
+            Notifikasi
+          </Link>
 
           {can(session, "account:manage") && (
             <Link

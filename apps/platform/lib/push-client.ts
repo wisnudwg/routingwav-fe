@@ -25,7 +25,7 @@ export function registerServiceWorker() {
 }
 
 /** Must be called from a click handler: iOS and Chrome both require a user gesture. */
-export async function subscribeToPush(email: string): Promise<"ok" | "denied" | "error"> {
+export async function subscribeToPush(key: string): Promise<"ok" | "denied" | "error"> {
   const permission = await Notification.requestPermission()
   if (permission !== "granted") return "denied"
 
@@ -41,7 +41,7 @@ export async function subscribeToPush(email: string): Promise<"ok" | "denied" | 
     const res = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, subscription: sub.toJSON() }),
+      body: JSON.stringify({ key, subscription: sub.toJSON() }),
     })
     return res.ok ? "ok" : "error"
   } catch {
