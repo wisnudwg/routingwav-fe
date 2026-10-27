@@ -6,23 +6,48 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@workspace/ui/components/button"
 import { requesterKey, type Actor } from "@/lib/approvals"
 import { initialsOf, useSession } from "@/lib/auth"
-import { formatDayLabel, unreadCount } from "@/lib/messages"
-import { devIncoming, getThread, markConversationRead, type Thread } from "@/lib/messages-api"
+import { DEAL_LABEL, dealOf, formatDayLabel, unreadCount, type DealStatus, type Message } from "@/lib/messages"
+import {
+  deleteMessage,
+  devIncoming,
+  devSetDealStatus,
+  getThread,
+  markConversationRead,
+  type Thread,
+} from "@/lib/messages-api"
 import { MESSAGES_EVENT } from "@/lib/messages-store"
 import { can } from "@/lib/permissions"
 import { KIND_INFO } from "@/lib/roles"
 import { useActor } from "@/lib/use-actor"
+import { useNow } from "@/lib/use-now"
 import { jakartaDay } from "@/lib/wallet"
 import { MessageBubble } from "./message-bubble"
 import { MessageComposer } from "./message-composer"
 
-function DevThreadTools({ actor, id }: { actor: Actor; id: string }) {
+const DEAL_STEPS: DealStatus[] = ["none", "in_progress", "completed_paid"]
+
+function DevThreadTools({ actor, id, deal }: { actor: Actor; id: string; deal: DealStatus }) {
   if (process.env.NODE_ENV === "production") return null
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-dashed bg-slate-50 px-3 py-2">
-      <span className="text-[11px] text-slate-500">Dev: simulasi lawan bicara</span>
-      <Button size="sm" variant="outline" onClick={() => devIncoming(actor, id, "text")}>Pesan masuk</Button>
-      <Button size="sm" variant="outline" onClick={() => devIncoming(actor, id, "audio")}>Audio masuk (WAV)</Button>
+    <div className="space-y-2 border-t border-dashed bg-slate-50 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] text-slate-500">Dev: simulasi lawan bicara</span>
+        <Button size="sm" variant="outline" onClick={() => devIncoming(actor, id, "text")}>Pesan masuk</Button>
+        <Button size="sm" variant="outline" onClick={() => devIncoming(actor, id, "audio")}>Audio masuk (WAV 30 dtk)</Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] text-slate-500">Dev: status kontrak</span>
+        {DEAL_STEPS.map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={deal === s ? "default" : "outline"}
+            onClick={() => devSetDealStatus(actor, id, s)}
+          >
+            {DEAL_LABEL[s]}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -30,7 +55,9 @@ function DevThreadTools({ actor, id }: { actor: Actor; id: string }) {
 export function ThreadView({ id }: { id: string }) {
   const actor = useActor()
   const session = useSession()
+  const now = useNow()
   const [state, setState] = useState<{ key: string; thread: Thread | null } | null>(null)
+  const [editing, setEditing] = useState<Message | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true) // keep following new messages while the reader is near the bottom
 
@@ -95,6 +122,7 @@ export function ThreadView({ id }: { id: string }) {
 
   const { conversation: c, messages } = thread
   const canSend = !!session && can(session, "messages:send")
+  const isOwner = actor.kind === "root"
 
   return (
     <div className="flex h-full flex-col">
@@ -143,18 +171,33 @@ export function ThreadView({ id }: { id: string }) {
                   {formatDayLabel(m.createdAt)}
                 </p>
               )}
-              <MessageBubble message={m} showMeta={!sameSender} />
+              <MessageBubble
+                message={m}
+                showMeta={!sameSender}
+                conversation={c}
+                me={me}
+                isOwner={isOwner}
+                canSend={canSend}
+                now={now}
+                onEdit={setEditing}
+                onDelete={async (msg) => {
+                  const res = await deleteMessage(actor, id, msg.id)
+                  return res.ok ? null : res.message
+                }}
+              />
             </Fragment>
           )
         })}
       </div>
 
-      <DevThreadTools actor={actor} id={id} />
+      <DevThreadTools actor={actor} id={id} deal={dealOf(c)} />
       <MessageComposer
-        key={id}
         actor={actor}
         conversationId={id}
+        ourKind={c.ourKind}
         canSend={canSend}
+        editing={editing}
+        onExitEdit={() => setEditing(null)}
         onSending={() => {
           stick.current = true
         }}

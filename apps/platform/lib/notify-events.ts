@@ -178,3 +178,21 @@ export function messageReceived(p: { account: string; conversationId: string; fr
     tag: `conv-${p.conversationId}`,
   })
 }
+
+/** The deal is complete and paid: the buyer's side can now download the work files */
+export function filesUnlocked(p: { account: string; conversationId: string }) {
+  const members = teamStore
+    .list(p.account)
+    .filter((m) => m.status === "active" && m.permissions.includes("files:download"))
+    .map((m) => m.username)
+
+  notify({
+    account: p.account,
+    category: "deals",
+    to: ["owner", ...members],
+    title: "File hasil kerja kini bisa diunduh",
+    body: "Kontrak selesai dan dibayar. Buka percakapan untuk mengunduh.",
+    url: `/messages/${p.conversationId}`,
+    tag: `unlock-${p.conversationId}`,
+  })
+}

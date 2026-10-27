@@ -1,21 +1,27 @@
 import { getAccountProfile } from "./account-api"
 import { requesterKey, type Actor } from "./approvals"
+import { logEvent } from "./audit"
 import { deleteBlob, getBlob, putBlob } from "./audio-blob-store"
 import { makeToneWav, readAudioInfo, sniffAudio } from "./audio-utils"
+import { accessRules, sanitizeFilename, type AccessState } from "./files"
 import {
   MAX_TEXT,
   audioKindOf,
+  dealOf,
+  deleteBlockReason,
+  editBlockReason,
   previewOf,
   unreadCount,
   validateAudioFile,
   type Attachment,
   type Conversation,
   type ConversationRow,
+  type DealStatus,
   type Message,
 } from "./messages"
 import { messagesStore } from "./messages-store"
 import { notificationsStore } from "./notifications-store"
-import { messageReceived } from "./notify-events"
+import { filesUnlocked, messageReceived } from "./notify-events"
 import type { ProfileKind } from "./roles"
 import type { ApiResult } from "./team-api"
 import { teamStore } from "./team-store"
@@ -25,12 +31,31 @@ const isProd = () => process.env.NODE_ENV === "production"
 
 const NO_SEND = "Anda tidak memiliki izin untuk mengirim pesan."
 const NOT_FOUND = "Percakapan tidak ditemukan."
+const MSG_NOT_FOUND = "Pesan tidak ditemukan."
+
+type MsgPermission = "messages:view" | "messages:send" | "files:download"
 
 /** Checked on every call. A real server does this from the session, never from client input. */
-function mayUse(actor: Actor, permission: "messages:view" | "messages:send") {
+function mayUse(actor: Actor, permission: MsgPermission) {
   if (actor.kind === "root") return true
   const m = teamStore.find(actor.alias, actor.username)
   return !!m && m.status === "active" && m.permissions.includes(permission)
+}
+
+/** What a browser may receive. Previous versions and deleted content never leave the server. */
+function forClient(m: Message): Message {
+  return {
+    id: m.id,
+    conversationId: m.conversationId,
+    account: m.account,
+    from: m.from,
+    authorKey: m.authorKey,
+    createdAt: m.createdAt,
+    editedAt: m.editedAt,
+    deletedAt: m.deletedAt,
+    deletedBy: m.deletedBy,
+    ...(m.deletedAt ? {} : { text: m.text, attachment: m.attachment }),
+  }
 }
 
 export type Thread = { conversation: Conversation; messages: Message[] }
@@ -63,7 +88,8 @@ export async function getThread(actor: Actor, id: string): Promise<Thread | null
   await sleep(150)
   if (!mayUse(actor, "messages:view")) return null
   const conversation = messagesStore.conversation(actor.alias, id)
-  return conversation ? { conversation, messages: messagesStore.messages(actor.alias, id) } : null
+  if (!conversation) return null
+  return { conversation, messages: messagesStore.messages(actor.alias, id).map(forClient) }
 }
 
 /** Marks the conversation read for this person only, and clears its bell items */
@@ -121,7 +147,7 @@ export async function discardAttachment(id: string): Promise<void> {
   await deleteBlob(id)
 }
 
-/* ---------- sending ---------- */
+/* ---------- send / edit / delete ---------- */
 
 export async function sendMessage(
   actor: Actor,
@@ -138,10 +164,16 @@ export async function sendMessage(
   if (text && text.length > MAX_TEXT) return { ok: false, message: `Pesan maksimal ${MAX_TEXT} karakter.` }
   if (!text && !input.attachment) return { ok: false, message: "Pesan kosong." }
 
+  let attachment: Attachment | undefined
   if (input.attachment) {
     const stored = await getBlob(input.attachment.id)
     if (!stored || stored.size !== input.attachment.size) {
       return { ok: false, message: "Lampiran tidak ditemukan. Unggah ulang file Anda." }
+    }
+    // The server decides the role: only Talent-side uploads can be deliverables
+    attachment = {
+      ...input.attachment,
+      role: conv.ourKind === "talent" && input.attachment.role !== "reference" ? "deliverable" : "reference",
     }
   }
 
@@ -159,7 +191,7 @@ export async function sendMessage(
     from: { side: "us", party: profile?.name?.trim() || actor.alias, member },
     authorKey: requesterKey(actor),
     text,
-    attachment: input.attachment,
+    attachment,
     createdAt: now,
   }
   messagesStore.insertMessage(message)
@@ -168,10 +200,128 @@ export async function sendMessage(
     lastPreview: previewOf(message),
     reads: { ...conv.reads, [requesterKey(actor)]: now }, // the sender has read up to here
   })
-  return { ok: true, data: message }
+  return { ok: true, data: forClient(message) }
 }
 
-/* ---------- DEV ONLY: a simulated counterparty ---------- */
+function isLatest(account: string, conversationId: string, messageId: string) {
+  const list = messagesStore.messages(account, conversationId)
+  return list[list.length - 1]?.id === messageId
+}
+
+export async function editMessage(
+  actor: Actor,
+  conversationId: string,
+  messageId: string,
+  rawText: string
+): Promise<ApiResult<Message>> {
+  await sleep(200)
+  if (!mayUse(actor, "messages:send")) return { ok: false, message: NO_SEND }
+
+  const conv = messagesStore.conversation(actor.alias, conversationId)
+  const msg = messagesStore.message(actor.alias, messageId)
+  if (!conv || !msg || msg.conversationId !== conv.id) return { ok: false, message: MSG_NOT_FOUND }
+
+  const blocked = editBlockReason(msg, requesterKey(actor), Date.now())
+  if (blocked) return { ok: false, message: blocked }
+
+  const text = rawText.trim() || undefined
+  if (text && text.length > MAX_TEXT) return { ok: false, message: `Pesan maksimal ${MAX_TEXT} karakter.` }
+  if (!text && !msg.attachment) return { ok: false, message: "Pesan tidak boleh kosong." }
+  if (text === msg.text) return { ok: true, data: forClient(msg) } // nothing changed
+
+  const updated = messagesStore.updateMessage(actor.alias, msg.id, {
+    text,
+    editedAt: new Date().toISOString(),
+    history: [...(msg.history ?? []), { at: msg.editedAt ?? msg.createdAt, text: msg.text }],
+  })
+  if (!updated) return { ok: false, message: MSG_NOT_FOUND }
+
+  if (isLatest(actor.alias, conv.id, msg.id)) {
+    messagesStore.updateConversation(actor.alias, conv.id, { lastPreview: previewOf(updated) })
+  }
+  return { ok: true, data: forClient(updated) }
+}
+
+export async function deleteMessage(actor: Actor, conversationId: string, messageId: string): Promise<ApiResult> {
+  await sleep(200)
+  if (!mayUse(actor, "messages:send")) return { ok: false, message: NO_SEND }
+
+  const conv = messagesStore.conversation(actor.alias, conversationId)
+  const msg = messagesStore.message(actor.alias, messageId)
+  if (!conv || !msg || msg.conversationId !== conv.id) return { ok: false, message: MSG_NOT_FOUND }
+
+  const blocked = deleteBlockReason(msg, requesterKey(actor), actor.kind === "root", Date.now(), dealOf(conv))
+  if (blocked) return { ok: false, message: blocked }
+
+  // Soft delete: the original stays on the server for disputes. Browsers only ever get the tombstone.
+  messagesStore.updateMessage(actor.alias, msg.id, {
+    deletedAt: new Date().toISOString(),
+    deletedBy: requesterKey(actor),
+  })
+  if (isLatest(actor.alias, conv.id, msg.id)) {
+    messagesStore.updateConversation(actor.alias, conv.id, { lastPreview: "Pesan dihapus" })
+  }
+  return { ok: true, data: undefined }
+}
+
+/* ---------- playback and download (the API decides, the UI only reflects it) ---------- */
+
+function resolveAttachment(actor: Actor, conversationId: string, messageId: string) {
+  if (!mayUse(actor, "messages:view")) return null
+  const conversation = messagesStore.conversation(actor.alias, conversationId)
+  const message = messagesStore.message(actor.alias, messageId)
+  if (!conversation || !message || message.conversationId !== conversation.id) return null
+  if (message.deletedAt || !message.attachment) return null
+  return { conversation, message, attachment: message.attachment }
+}
+
+export async function getAttachmentAccess(
+  actor: Actor,
+  conversationId: string,
+  messageId: string
+): Promise<AccessState | null> {
+  const r = resolveAttachment(actor, conversationId, messageId)
+  if (!r) return null
+  return accessRules({ ...r, mayDownload: mayUse(actor, "files:download") })
+}
+
+/**
+ * MOCK: both cases return the same bytes. A real server returns a URL to the separately rendered watermarked
+ * preview while access.watermarked is true, and the original only once the buyer is entitled.
+ */
+export async function getAttachmentBlob(actor: Actor, conversationId: string, messageId: string): Promise<Blob | null> {
+  const r = resolveAttachment(actor, conversationId, messageId)
+  return r ? getBlob(r.attachment.id) : null
+}
+
+export async function downloadAttachment(
+  actor: Actor,
+  conversationId: string,
+  messageId: string
+): Promise<ApiResult<{ blob: Blob; filename: string }>> {
+  await sleep(200)
+  const r = resolveAttachment(actor, conversationId, messageId)
+  if (!r) return { ok: false, message: "File tidak ditemukan." }
+
+  const { download } = accessRules({ ...r, mayDownload: mayUse(actor, "files:download") })
+  if (!download.allowed) {
+    return {
+      ok: false,
+      message:
+        download.reason === "locked_until_paid"
+          ? "File ini baru bisa diunduh setelah kontrak selesai dan dibayar."
+          : "Anda tidak memiliki izin mengunduh file.",
+    }
+  }
+
+  const blob = await getBlob(r.attachment.id)
+  if (!blob) return { ok: false, message: "File tidak ditemukan." }
+
+  logEvent(actor.alias, actor.label, "file_downloaded", `${r.attachment.name} · ${r.conversation.counterparty.name}`)
+  return { ok: true, data: { blob, filename: sanitizeFilename(r.attachment.name) } }
+}
+
+/* ---------- DEV ONLY: a simulated counterparty and deal ---------- */
 
 const SAMPLE_TEXTS = [
   "Halo! Bisa kirim revisi mix-nya hari ini?",
@@ -218,6 +368,7 @@ export async function devStartConversation(
     lastMessageAt: now,
     lastPreview: "",
     reads: {},
+    dealStatus: "none",
   }
   messagesStore.insertConversation(conv)
   deliverIncoming(conv, SAMPLE_TEXTS[0])
@@ -236,15 +387,31 @@ export async function devIncoming(actor: Actor, id: string, type: "text" | "audi
   }
 
   const freq = [440, 523, 659][Math.floor(Math.random() * 3)]!
-  const blob = makeToneWav(4, freq)
+  const blob = makeToneWav(30, freq) // long enough to hear the 4 s and 24 s watermark tags
   const attachment: Attachment = {
     id: crypto.randomUUID(),
     name: `preview-mix-${Math.floor(Math.random() * 90 + 10)}.wav`,
     size: blob.size,
     kind: "wav",
-    duration: 4,
+    duration: 30,
+    role: conv.counterparty.kind === "talent" ? "deliverable" : "reference",
   }
   await putBlob(attachment.id, blob)
-  deliverIncoming(conv, "Ini preview terbarunya, mohon didengarkan.", attachment)
+  deliverIncoming(conv, "Ini file terbarunya, mohon didengarkan.", attachment)
+  return { ok: true, data: undefined }
+}
+
+/** Stands in for the contract + payment state until the Contracts module exists */
+export async function devSetDealStatus(actor: Actor, id: string, status: DealStatus): Promise<ApiResult> {
+  await sleep(200)
+  if (isProd()) return { ok: false, message: "Tidak tersedia." }
+  const conv = messagesStore.conversation(actor.alias, id)
+  if (!conv) return { ok: false, message: NOT_FOUND }
+
+  const before = dealOf(conv)
+  messagesStore.updateConversation(actor.alias, id, { dealStatus: status })
+  if (status === "completed_paid" && before !== "completed_paid" && conv.ourKind === "client") {
+    filesUnlocked({ account: actor.alias, conversationId: id })
+  }
   return { ok: true, data: undefined }
 }

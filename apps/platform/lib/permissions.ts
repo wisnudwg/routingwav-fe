@@ -95,6 +95,11 @@ export const CATALOG = {
     scope: "shared", group: "Pesan", requires: ["messages:view"],
     label: "Kirim pesan & file", description: "Membalas pesan dan mengirim file audio (mp3/wav).",
   },
+  "files:download": {
+    scope: "shared", group: "Pesan", requires: ["messages:view"], sensitive: true,
+    label: "Unduh file audio",
+    description: "Mengunduh file audio dari percakapan. File hasil kerja dari pihak lain baru bisa diunduh setelah kontrak selesai dan dibayar.",
+  },
   "wallet:view": {
     scope: "shared", group: "Wallet",
     label: "Lihat Wallet", description: "Melihat saldo dan riwayat transaksi.",
@@ -234,7 +239,7 @@ export const PRESETS: {
     permissions: [
       ...VIEWER,
       "talent:products.manage", "talent:store.manage", "talent:studio.manage",
-      "client:projects.manage", "messages:send",
+      "client:projects.manage", "messages:send", "files:download",
     ],
   },
   {

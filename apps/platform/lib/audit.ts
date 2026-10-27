@@ -9,6 +9,7 @@ export type AuditAction =
   | "delegation_saved" | "delegation_removed"
   | "representative_set" | "representative_revoked"
   | "member_email_set" | "member_email_removed" | "member_email_verified"
+  | "file_downloaded"
 
 export const AUDIT_LABEL: Record<AuditAction, string> = {
   profile_updated: "Data akun diperbarui",
@@ -33,6 +34,7 @@ export const AUDIT_LABEL: Record<AuditAction, string> = {
   member_email_set: "Email anggota ditambahkan",
   member_email_removed: "Email anggota dihapus",
   member_email_verified: "Email anggota diverifikasi",
+  file_downloaded: "File audio diunduh",
 }
 
 export type AuditEvent = {

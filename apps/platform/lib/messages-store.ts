@@ -42,4 +42,17 @@ export const messagesStore = {
     writeJson(MKEY, [...allMessages(), m].slice(-2000))
     emit()
   },
+
+  message: (account: string, id: string) =>
+    allMessages().find((m) => m.account === account && m.id === id) ?? null,
+
+  updateMessage(account: string, id: string, patch: Partial<Message>) {
+    const all = allMessages()
+    const i = all.findIndex((m) => m.account === account && m.id === id)
+    if (i < 0) return null
+    all[i] = { ...all[i]!, ...patch }
+    writeJson(MKEY, all)
+    emit()
+    return all[i]!
+  },
 }
