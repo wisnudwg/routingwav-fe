@@ -82,7 +82,7 @@ export function MessageBubble({
         )}
       >
         {message.text && (
-          <p className="whitespace-pre-wrap break-words">
+          <p className="whitespace-pre-wrap wrap-break-word">
             {message.text}
             {message.editedAt && <span className="ml-1.5 text-[11px] opacity-70">(diedit)</span>}
           </p>
