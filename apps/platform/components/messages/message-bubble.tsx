@@ -22,7 +22,7 @@ export function MessageBubble({ message, showMeta }: { message: Message; showMet
           mine ? "rounded-br-sm bg-brand text-white" : "rounded-bl-sm border bg-white text-slate-900"
         )}
       >
-        {message.text && <p className="whitespace-pre-wrap break-words">{message.text}</p>}
+        {message.text && <p className="whitespace-pre-wrap wrap-break-word">{message.text}</p>}
         {message.attachment && (
           <div className="w-64 max-w-full sm:w-72">
             <AudioPlayer attachment={message.attachment} tone={mine ? "dark" : "light"} />
