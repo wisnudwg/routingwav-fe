@@ -3,6 +3,7 @@ import { approvalsStore } from "./approvals-store"
 import { formatIDR } from "./format"
 import { notify } from "./notify"
 import type { ProfileKind } from "./roles"
+import { teamStore } from "./team-store"
 
 /** Who may decide a pending request: the owner plus covering delegates (never the requester) */
 function deciders(req: ApprovalRequest): string[] {
@@ -156,5 +157,24 @@ export function kycDecided(account: string, decision: "verified" | "rejected") {
         ? "Anda kini dapat menambah rekening bank dan menarik saldo."
         : "Perbarui data Anda lalu ajukan kembali.",
     url: "/account/verification",
+  })
+}
+
+/** Everyone in the account who can read messages: the owner plus active members with messages:view */
+export function messageReceived(p: { account: string; conversationId: string; from: string; hasAudio: boolean }) {
+  const members = teamStore
+    .list(p.account)
+    .filter((m) => m.status === "active" && m.permissions.includes("messages:view"))
+    .map((m) => m.username)
+
+  notify({
+    account: p.account,
+    category: "messages",
+    to: ["owner", ...members],
+    // Deliberately generic: lock screens and mailboxes shouldn't show what a deal discussion says
+    title: `Pesan baru dari ${p.from}`,
+    body: p.hasAudio ? "Mengirim file audio." : "Anda memiliki pesan baru.",
+    url: `/messages/${p.conversationId}`,
+    tag: `conv-${p.conversationId}`,
   })
 }

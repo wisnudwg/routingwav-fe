@@ -10,6 +10,7 @@ import { NAV_BY_MODE, SHARED_NAV, type NavItem } from "@/lib/nav-config"
 import { can } from "@/lib/permissions"
 import { useActiveMode } from "@/lib/use-active-mode"
 import { useMobileNav } from "./nav-context"
+import { useMessageUnread } from "@/lib/use-message-unread"
 
 const isActive = (pathname: string, href: string) =>
   pathname === href || pathname.startsWith(`${href}/`)
@@ -46,6 +47,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter()
   const session = useSession()
   const mode = useActiveMode()
+  const unreadMessages = useMessageUnread()
 
   const visible = (i: NavItem) => !i.permission || (!!session && can(session, i.permission))
   const items = mode ? NAV_BY_MODE[mode].filter(visible) : []
@@ -89,6 +91,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <NavLink key={item.href} href={item.href} active={isActive(pathname, item.href)} onClick={onNavigate}>
         <Icon className="size-5 text-slate-500" aria-hidden />
         {item.label}
+        {item.href === "/messages" && unreadMessages > 0 && (
+          <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-medium leading-5 text-white">
+            {unreadMessages > 99 ? "99+" : unreadMessages}
+          </span>
+        )}
       </NavLink>
     )
   }

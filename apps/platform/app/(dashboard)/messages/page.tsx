@@ -1,11 +1,7 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon"
-
-export default function MessagesPage() {
+export default function MessagesIndexPage() {
   return (
-    <ComingSoon
-      title="Messages"
-      permission="messages:view"
-      description="Chat dan pertukaran file audio (mp3/wav) akan ada di sini."
-    />
+    <div className="grid h-full place-items-center p-6 text-center text-sm text-slate-500">
+      Pilih percakapan untuk mulai membaca dan membalas.
+    </div>
   )
 }
