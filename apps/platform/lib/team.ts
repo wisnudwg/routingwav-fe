@@ -13,6 +13,9 @@ export type TeamMember = {
   mustChangePassword: boolean
   createdAt: string
   lastSignInAt?: string
+  /** Optional address for notification emails. Never used to sign in or reset a password. */
+  email?: string
+  emailVerified: boolean
 }
 
 export const signInUrl = (origin: string, alias: string) =>

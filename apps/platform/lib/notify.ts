@@ -29,6 +29,13 @@ async function sendPush(key: string, payload: { title: string; body: string; url
   } catch {}
 }
 
+/** Owner: the account email. Member: only a VERIFIED address, otherwise nothing. */
+function emailFor(account: string, user: string): string | undefined {
+  if (user === "owner") return notificationsStore.ownerEmail(account)
+  const m = teamStore.find(account, user)
+  return m?.emailVerified && m.email ? m.email : undefined
+}
+
 export function notify(input: NotifyInput) {
   const { account, category, title, body, url, tag, by } = input
   const createdAt = new Date().toISOString()
@@ -49,9 +56,9 @@ export function notify(input: NotifyInput) {
       void sendPush(`${account}:${user}`, { title, body, url, tag: tag ?? category })
     }
 
-    // 3) Email: owners only, since team members have no email address
-    if (prefs.email && user === "owner") {
-      const to = notificationsStore.ownerEmail(account)
+    // 3) Email
+    if (prefs.email) {
+      const to = emailFor(account, user)
       if (to) {
         notificationsStore.queueEmail({
           id: crypto.randomUUID(),

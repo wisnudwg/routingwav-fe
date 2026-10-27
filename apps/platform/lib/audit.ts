@@ -8,6 +8,7 @@ export type AuditAction =
   | "approval_requested" | "approval_approved" | "approval_rejected" | "approval_cancelled"
   | "delegation_saved" | "delegation_removed"
   | "representative_set" | "representative_revoked"
+  | "member_email_set" | "member_email_removed" | "member_email_verified"
 
 export const AUDIT_LABEL: Record<AuditAction, string> = {
   profile_updated: "Data akun diperbarui",
@@ -29,6 +30,9 @@ export const AUDIT_LABEL: Record<AuditAction, string> = {
   delegation_removed: "Delegasi persetujuan dicabut",
   representative_set: "Perwakilan ditunjuk",
   representative_revoked: "Penunjukan perwakilan dicabut",
+  member_email_set: "Email anggota ditambahkan",
+  member_email_removed: "Email anggota dihapus",
+  member_email_verified: "Email anggota diverifikasi",
 }
 
 export type AuditEvent = {

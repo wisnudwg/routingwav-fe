@@ -1,7 +1,11 @@
 import type { ProfileKind } from "./roles"
 import type { TeamMember } from "./team"
 
-export type MockMember = TeamMember & { password: string }
+export type MockMember = TeamMember & {
+  password: string
+  emailToken?: string
+  emailTokenExpiresAt?: string
+}
 
 type Db = { members: MockMember[]; profiles: Record<string, ProfileKind[]> }
 
@@ -61,4 +65,5 @@ export const teamStore = {
     db.profiles[alias] = profiles
     write(db)
   },
+  findByEmailToken: (token: string) => read().members.find((m) => m.emailToken === token) ?? null,
 }

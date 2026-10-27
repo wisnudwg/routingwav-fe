@@ -11,7 +11,7 @@ export type Owner = { alias: string; profiles: ProfileKind[] }
 export type ApiResult<T = void> = { ok: true; data: T } | { ok: false; message: string }
 
 // Never expose the password field
-const toPublic = (m: MockMember): TeamMember => ({
+export const toPublic = (m: MockMember): TeamMember => ({
   id: m.id,
   account: m.account,
   username: m.username,
@@ -21,6 +21,8 @@ const toPublic = (m: MockMember): TeamMember => ({
   mustChangePassword: m.mustChangePassword,
   createdAt: m.createdAt,
   lastSignInAt: m.lastSignInAt,
+  email: m.email,
+  emailVerified: !!m.emailVerified,
 })
 
 const sanitize = (perms: Permission[], owner: Owner) =>
@@ -68,6 +70,7 @@ export async function createTeamMember(
     mustChangePassword: true,
     createdAt: new Date().toISOString(),
     password: tempPassword,
+    emailVerified: false,
   }
   teamStore.insert(record)
   return { ok: true, data: { member: toPublic(record), tempPassword } }

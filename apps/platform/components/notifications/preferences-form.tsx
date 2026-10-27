@@ -3,40 +3,64 @@
 import { useEffect, useState } from "react"
 import { Lock } from "lucide-react"
 import { requesterKey } from "@/lib/approvals"
+import { getMyEmailStatus, type MyEmailStatus } from "@/lib/member-email-api"
 import { CATEGORIES, CATEGORY_INFO, type Category, type Channel, type Prefs } from "@/lib/notifications"
 import { getPrefs, savePrefs } from "@/lib/notifications-api"
+import { NOTIFICATIONS_EVENT } from "@/lib/notifications-store"
 import { useActor } from "@/lib/use-actor"
+
+type EmailInfo = { kind: "owner" } | { kind: "member"; status: MyEmailStatus }
+
+function emailNote(info: EmailInfo) {
+  if (info.kind === "owner") return "Email dikirim ke alamat email akun Anda."
+  const s = info.status
+  if (s.state === "verified") return `Email dikirim ke ${s.masked}.`
+  if (s.state === "pending") {
+    return `Alamat ${s.masked} belum diverifikasi. Buka tautan verifikasi yang dikirim ke alamat itu. Sebelum itu, notifikasi email tidak dikirim.`
+  }
+  return "Belum ada alamat email untuk akun Anda. Minta pemilik akun menambahkannya. Anda tetap menerima notifikasi di aplikasi dan push."
+}
 
 export function PreferencesForm() {
   const actor = useActor()
   const alias = actor?.alias
   const user = actor ? requesterKey(actor) : undefined
-  const [state, setState] = useState<{ key: string; prefs: Prefs } | null>(null)
+  const username = actor?.kind === "iam" ? actor.username : undefined
+  const [state, setState] = useState<{ key: string; prefs: Prefs; email: EmailInfo } | null>(null)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (!alias || !user) return
     let cancelled = false
-    getPrefs(alias, user).then((prefs) => {
-      if (!cancelled) setState({ key: `${alias}:${user}`, prefs })
-    })
+    const key = `${alias}:${user}`
+    const load = () =>
+      Promise.all([getPrefs(alias, user), username ? getMyEmailStatus(alias, username) : Promise.resolve(null)]).then(
+        ([prefs, status]) => {
+          if (!cancelled) setState({ key, prefs, email: status ? { kind: "member", status } : { kind: "owner" } })
+        }
+      )
+    void load()
+    window.addEventListener(NOTIFICATIONS_EVENT, load) // also fires when the address gets verified
+    window.addEventListener("storage", load)
     return () => {
       cancelled = true
+      window.removeEventListener(NOTIFICATIONS_EVENT, load)
+      window.removeEventListener("storage", load)
     }
-  }, [alias, user])
+  }, [alias, user, username])
 
   if (!actor || !alias || !user) return null
   if (!state || state.key !== `${alias}:${user}`) return <p className="text-sm text-slate-500">Memuat…</p>
 
-  const prefs = state.prefs
-  const canEmail = actor.kind === "root"
+  const { prefs, email } = state
+  const canEmail = email.kind === "owner" || email.status.state === "verified"
 
   const toggle = async (category: Category, channel: Channel) => {
     const next: Prefs = { ...prefs, [category]: { ...prefs[category], [channel]: !prefs[category][channel] } }
     setSaved(false)
-    setState({ key: state.key, prefs: next })
+    setState({ ...state, prefs: next })
     const confirmed = await savePrefs(alias, user, next) // the server enforces the locks
-    setState({ key: state.key, prefs: confirmed })
+    setState((s) => (s ? { ...s, prefs: confirmed } : s))
     setSaved(true)
   }
 
@@ -47,11 +71,7 @@ export function PreferencesForm() {
         {saved && <span role="status" className="text-xs text-green-700">Tersimpan</span>}
       </div>
 
-      <p className="text-xs leading-relaxed text-slate-600">
-        {canEmail
-          ? "Email dikirim ke alamat email akun Anda."
-          : "Akun anggota tim tidak memiliki alamat email, sehingga notifikasi email tidak tersedia. Anda tetap menerima notifikasi di aplikasi dan push."}
-      </p>
+      <p className="text-xs leading-relaxed text-slate-600">{emailNote(email)}</p>
 
       <div className="divide-y">
         {CATEGORIES.map((c) => {

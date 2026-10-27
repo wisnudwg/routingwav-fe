@@ -60,4 +60,20 @@ export const notificationsStore = {
     all[account] = email
     writeJson(OKEY, all)
   },
+
+  markReadByUrl(account: string, user: string, url: string) {
+    const now = new Date().toISOString()
+    let changed = false
+    const next = readJson<AppNotification[]>(NKEY, []).map((n) => {
+      if (n.account === account && n.user === user && !n.readAt && n.url === url) {
+        changed = true
+        return { ...n, readAt: now }
+      }
+      return n
+    })
+    if (changed) {
+      writeJson(NKEY, next)
+      emit()
+    }
+  },
 }

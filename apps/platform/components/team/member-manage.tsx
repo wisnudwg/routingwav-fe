@@ -19,6 +19,7 @@ import { useOwner } from "@/lib/use-owner"
 import { CredentialsCard } from "./credentials-card"
 import { PermissionEditor } from "./permission-editor"
 import { NoOwner } from "./team-view"
+import { MemberEmailCard } from "./member-email-card"
 
 const sameSet = (a: Permission[], b: Permission[]) =>
   a.length === b.length && a.every((p) => b.includes(p))
@@ -239,6 +240,8 @@ export function MemberManage({ id }: { id: string }) {
           sungguhan, izin dicek di server pada setiap permintaan, jadi berlaku langsung.
         </p>
       </section>
+
+      <MemberEmailCard owner={owner} member={m} onUpdated={setMember} />
 
       <section className="divide-y rounded-lg border bg-white p-4 md:p-6">
         <ActionRow

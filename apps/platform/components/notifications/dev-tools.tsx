@@ -9,6 +9,20 @@ import { listOutbox, sendTestNotification } from "@/lib/notifications-api"
 import { NOTIFICATIONS_EVENT } from "@/lib/notifications-store"
 import { useActor } from "@/lib/use-actor"
 
+function Linkified({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(https?:\/\/\S+)/g).map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} className="text-brand underline">{part}</a>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
+}
+
 function DevToolsInner() {
   const actor = useActor()
   const alias = actor?.alias
@@ -69,7 +83,7 @@ function DevToolsInner() {
                         kepada {m.to} · {CATEGORY_INFO[m.category].label} · {formatDateTime(m.createdAt)}
                       </span>
                     </summary>
-                    <pre className="mt-2 whitespace-pre-wrap text-xs text-slate-700">{m.body}</pre>
+                    <pre className="mt-2 whitespace-pre-wrap text-xs text-slate-700"><Linkified text={m.body} /></pre>
                   </details>
                 </li>
               ))}
