@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "api:types": "openapi-typescript http://localhost:4000/openapi.json -o src/lib/api-schema.d.ts",
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
@@ -35,6 +36,7 @@
     "@workspace/eslint-config": "*",
     "@workspace/typescript-config": "*",
     "eslint": "^10",
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5"
   }
 }
