@@ -1,48 +1,30 @@
-import { useMemo, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useSyncExternalStore } from "react"
+import { api, ApiError, setUnauthenticatedHandler } from "./api"
+import type { EmailStatus, Permission, SessionView } from "./api-types"
+import { mirrorSession } from "./mock-bridge"
 import { homeHref } from "./nav-config"
-import {
-  availableModes,
-  limitToProfiles,
-  normalizePermissions,
-  type Permission,
-} from "./permissions"
+import { availableModes } from "./permissions"
 import { isProfileKind, type ProfileKind } from "./roles"
 
+export type { EmailStatus }
 export type PendingStep = "complete-profile" | "change-password"
 
-type Access = {
-  /** Profiles this account has. A person can be Talent, Client, or both. */
-  profiles: ProfileKind[]
-  /** The active/last-used profile. */
-  mode?: ProfileKind
-}
+type Access = { profiles: ProfileKind[]; mode?: ProfileKind }
 
 export type Session =
-  | ({
-      type: "root"
-      email: string
-      name?: string
-      /** The account ID (alias) that team members type at sign-in */
-      alias?: string
-      pending?: "complete-profile"
-    } & Access)
+  | ({ type: "root"; email: string; name?: string; alias?: string; pending?: "complete-profile" } & Access)
   | ({
       type: "iam"
       account: string
       username: string
       name?: string
       pending?: "change-password"
-      /** Deny by default: an IAM user can only do what's listed here */
       permissions: Permission[]
+      notificationEmail: EmailStatus
     } & Access)
 
-const SESSION_KEY = "session"
-const ACCOUNT_KEY = "last-iam-account" // convenience only, not sensitive
-const EVENT = "auth-change"
-
 /** Stable identifier of whoever is signed in (e.g. to key push subscriptions) */
-export const sessionId = (s: Session) =>
-  s.type === "root" ? s.email : `${s.username}@${s.account}`
+export const sessionId = (s: Session) => (s.type === "root" ? s.email : `${s.username}@${s.account}`)
 
 export const displayName = (s: Session) =>
   s.name?.trim() || (s.type === "root" ? s.email.split("@")[0] || s.email : s.username)
@@ -66,100 +48,131 @@ export function homeFor(s: Session): string {
   return "/no-access"
 }
 
-function readRaw(): string | null {
+/* ------------------------------------------------------------------ store */
+
+type Store = { status: "loading" | "ready"; server: SessionView | null }
+const LOADING: Store = { status: "loading", server: null }
+
+let store: Store = LOADING
+let inflight: Promise<void> | null = null
+let lastLoadAt = 0
+const listeners = new Set<() => void>()
+
+const MODE_KEY = "rw:mode" // a UI preference, not security-relevant
+const EPOCH_KEY = "rw:session-epoch" // bumped on sign-in/out so other tabs reload
+const ACCOUNT_KEY = "last-iam-account" // convenience only, not sensitive
+
+const emit = () => listeners.forEach((l) => l())
+const subscribe = (cb: () => void) => {
+  listeners.add(cb)
+  return () => listeners.delete(cb)
+}
+
+function setStore(next: Store) {
+  store = next
+  if (next.server) mirrorSession(next.server) // dev-only bridge for the remaining mock modules
+  emit()
+}
+
+const bumpEpoch = () => {
   try {
-    return window.localStorage.getItem(SESSION_KEY)
+    window.localStorage.setItem(EPOCH_KEY, String(Date.now()))
+  } catch {}
+}
+
+function readMode(): string | null {
+  try {
+    return window.localStorage.getItem(MODE_KEY)
   } catch {
     return null
   }
 }
 
-function parseProfiles(v: Record<string, unknown>, pending: boolean): ProfileKind[] {
-  // Sessions saved before profiles existed have none: treat them as Talent
-  let profiles: ProfileKind[] = Array.isArray(v.profiles)
-    ? Array.from(new Set((v.profiles as unknown[]).filter(isProfileKind)))
-    : ["talent"]
-  if (profiles.length === 0 && !pending) profiles = ["talent"] // only a pending sign-up may have none
-  return profiles
-}
-
-function pickMode(s: Session, raw: unknown): ProfileKind | undefined {
-  const modes = availableModes(s)
-  if (isProfileKind(raw) && modes.includes(raw)) return raw
-  return modes.find((m) => homeHref(s, m) !== null) ?? modes[0]
-}
-
-function parse(raw: string | null): Session | null {
-  if (!raw) return null
+export function setPreferredMode(mode: ProfileKind) {
   try {
-    const v = JSON.parse(raw) as Record<string, unknown> | null
-    if (!v) return null
+    window.localStorage.setItem(MODE_KEY, mode)
+  } catch {}
+  emit()
+}
 
-    if (v.type === "root" && typeof v.email === "string") {
-      const pending = v.pending === "complete-profile" ? ("complete-profile" as const) : undefined
-      const root: Session = {
-        type: "root",
-        email: v.email,
-        name: typeof v.name === "string" ? v.name : undefined,
-        alias: typeof v.alias === "string" ? v.alias : undefined,
-        pending,
-        profiles: parseProfiles(v, !!pending),
+function toSession(view: SessionView, rawMode: string | null): Session {
+  const base: Session =
+    view.type === "root"
+      ? {
+          type: "root",
+          email: view.email,
+          name: view.name,
+          alias: view.alias,
+          pending: view.pending,
+          profiles: view.profiles,
+        }
+      : {
+          type: "iam",
+          account: view.account,
+          username: view.username,
+          name: view.name,
+          pending: view.pending,
+          profiles: view.profiles,
+          permissions: view.permissions,
+          notificationEmail: view.notificationEmail,
+        }
+
+  const modes = availableModes(base)
+  const preferred = isProfileKind(rawMode) && modes.includes(rawMode) ? rawMode : undefined
+  return { ...base, mode: preferred ?? modes.find((m) => homeHref(base, m) !== null) ?? modes[0] }
+}
+
+/** (Re)loads the session from the API. Network failures never sign anyone out. */
+export function loadSession(force = false): Promise<void> {
+  if (inflight) return inflight
+  if (!force && store.status === "ready") return Promise.resolve()
+
+  inflight = api<{ session: SessionView }>("/auth/session")
+    .then(
+      (r) => ({ ok: true as const, server: r.session }),
+      (e: unknown) =>
+        e instanceof ApiError && e.status === 401 ? { ok: true as const, server: null } : { ok: false as const },
+    )
+    .then((res) => {
+      lastLoadAt = Date.now()
+      if (!res.ok) {
+        if (store.status === "loading") setStore({ status: "ready", server: null })
+        return
       }
-      root.mode = pickMode(root, v.mode)
-      return root
-    }
-
-    if (v.type === "iam" && typeof v.account === "string" && typeof v.username === "string") {
-      const pending = v.pending === "change-password" ? ("change-password" as const) : undefined
-      const profiles = parseProfiles(v, !!pending)
-      const iam: Session = {
-        type: "iam",
-        account: v.account,
-        username: v.username,
-        name: typeof v.name === "string" ? v.name : undefined,
-        pending,
-        profiles,
-        permissions: limitToProfiles(
-          normalizePermissions(Array.isArray(v.permissions) ? v.permissions : []),
-          profiles
-        ),
-      }
-      iam.mode = pickMode(iam, v.mode)
-      return iam
-    }
-  } catch {}
-  return null
+      if (store.status === "ready" && JSON.stringify(store.server) === JSON.stringify(res.server)) return
+      setStore({ status: "ready", server: res.server })
+    })
+    .finally(() => {
+      inflight = null
+    })
+  return inflight
 }
 
-export const getSession = () => parse(readRaw())
+export const refreshSession = () => loadSession(true)
 
-export function storeSession(session: Session) {
-  try {
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-  } catch {}
-  window.dispatchEvent(new Event(EVENT))
+/** After any endpoint that returns a fresh session (sign-in, complete-profile, change-password, add-profile) */
+export function applyServerSession(view: SessionView) {
+  lastLoadAt = Date.now()
+  setStore({ status: "ready", server: view })
+  bumpEpoch()
 }
 
-export function clearSession() {
+export async function signOut() {
   try {
-    window.localStorage.removeItem(SESSION_KEY)
-    window.localStorage.removeItem("email") // leftover from the old email-only version
-  } catch {}
-  window.dispatchEvent(new Event(EVENT))
+    await api("/auth/sign-out", { method: "POST" })
+  } catch {} // already signed out, or offline: either way, drop local state
+  setStore({ status: "ready", server: null })
+  bumpEpoch()
+}
+
+export function getSession(): Session | null {
+  return store.server ? toSession(store.server, readMode()) : null
 }
 
 /** Persist the active profile. Ignored if the user can't enter it. */
 export function switchMode(mode: ProfileKind) {
   const s = getSession()
-  if (s && availableModes(s).includes(mode)) storeSession({ ...s, mode })
-}
-
-/** After the "add profile" flow succeeds: owners only, new profile becomes active */
-export function addProfileToSession(kind: ProfileKind) {
-  const s = getSession()
-  if (!s || s.type !== "root") return
-  const profiles = s.profiles.includes(kind) ? s.profiles : [...s.profiles, kind]
-  storeSession({ ...s, profiles, mode: kind })
+  if (s && availableModes(s).includes(mode)) setPreferredMode(mode)
 }
 
 export function getRememberedAccount(): string | null {
@@ -177,17 +190,39 @@ export function rememberAccount(account: string | null) {
   } catch {}
 }
 
-function subscribe(cb: () => void) {
-  window.addEventListener("storage", cb) // other tabs
-  window.addEventListener(EVENT, cb) // this tab
-  return () => {
-    window.removeEventListener("storage", cb)
-    window.removeEventListener(EVENT, cb)
-  }
+/** undefined = loading, null = signed out, object = signed in */
+export function useSession(): Session | null | undefined {
+  const snap = useSyncExternalStore(subscribe, () => store, () => LOADING)
+  const rawMode = useSyncExternalStore(subscribe, readMode, () => null)
+
+  useEffect(() => {
+    if (snap.status === "loading") void loadSession()
+  }, [snap.status])
+
+  return useMemo(
+    () => (snap.status === "loading" ? undefined : snap.server ? toSession(snap.server, rawMode) : null),
+    [snap, rawMode],
+  )
 }
 
-/** undefined = server / hydrating, null = signed out, object = signed in */
-export function useSession(): Session | null | undefined {
-  const raw = useSyncExternalStore<string | null | undefined>(subscribe, readRaw, () => undefined)
-  return useMemo(() => (raw === undefined ? undefined : parse(raw)), [raw])
+/* ------------------------------------------------------------- browser hooks */
+
+if (typeof window !== "undefined") {
+  try {
+    window.localStorage.removeItem("session") // leftover from the mock-session days
+  } catch {}
+
+  setUnauthenticatedHandler(() => setStore({ status: "ready", server: null }))
+
+  window.addEventListener("storage", (e) => {
+    if (e.key === EPOCH_KEY) void loadSession(true) // another tab signed in or out
+    if (e.key === MODE_KEY) emit()
+  })
+
+  // Catches server-side changes (permissions edited, member disabled) when the user returns to the tab
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && store.status === "ready" && Date.now() - lastLoadAt > 30_000) {
+      void loadSession(true)
+    }
+  })
 }

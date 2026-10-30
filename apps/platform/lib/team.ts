@@ -16,6 +16,7 @@ export type TeamMember = {
   /** Optional address for notification emails. Never used to sign in or reset a password. */
   email?: string
   emailVerified: boolean
+  tempPasswordExpiresAt?: string
 }
 
 export const signInUrl = (origin: string, alias: string) =>

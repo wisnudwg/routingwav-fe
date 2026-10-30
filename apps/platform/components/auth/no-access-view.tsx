@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Button } from "@workspace/ui/components/button"
-import { clearSession, homeFor, useSession } from "@/lib/auth"
+import { homeFor, signOut, useSession } from "@/lib/auth"
 
 export function NoAccessView() {
   const router = useRouter()
@@ -27,8 +27,8 @@ export function NoAccessView() {
       </p>
       <Button
         variant="outline"
-        onClick={() => {
-          clearSession()
+        onClick={async () => {
+          await signOut()
           router.replace("/auth/sign-in")
         }}
       >

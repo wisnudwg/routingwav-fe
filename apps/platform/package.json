@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "api:types": "openapi-typescript http://localhost:4000/openapi.json -o src/lib/api-schema.d.ts",
+    "api:types": "openapi-typescript http://localhost:4000/openapi.json -o lib/api-schema.d.ts",
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",

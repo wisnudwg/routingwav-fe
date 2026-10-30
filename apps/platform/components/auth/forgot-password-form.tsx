@@ -8,6 +8,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { forgotPasswordSchema, type ForgotPasswordValues } from "@/lib/validators"
 import { FormField } from "./form-field"
+import { forgotPassword } from "@/lib/auth-api"
 
 export function ForgotPasswordForm() {
   const [sentTo, setSentTo] = useState<string | null>(null)
@@ -16,11 +17,12 @@ export function ForgotPasswordForm() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    setError,
   } = useForm<ForgotPasswordValues>({ resolver: zodResolver(forgotPasswordSchema) })
 
   async function onSubmit(values: ForgotPasswordValues) {
-    // TODO: POST { email } to the API. The server emails a link like
-    //   `${origin}/auth/reset-password?token=<one-time-token>`
+    const result = await forgotPassword(values.email) // same answer whether or not the email exists
+    if (!result.ok) return setError("email", { message: result.message })
     setSentTo(values.email)
   }
 

@@ -8,6 +8,7 @@ import { Button } from "@workspace/ui/components/button"
 import { resetPasswordSchema, type ResetPasswordValues } from "@/lib/validators"
 import { FormField } from "./form-field"
 import { PasswordInput, PasswordSpecifications } from "./password-input"
+import { resetPassword } from "@/lib/auth-api"
 
 export function ResetPasswordForm({ token }: { token?: string }) {
   const router = useRouter()
@@ -15,6 +16,7 @@ export function ResetPasswordForm({ token }: { token?: string }) {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    setError,
   } = useForm<ResetPasswordValues>({ resolver: zodResolver(resetPasswordSchema) })
 
   if (!token) {
@@ -32,7 +34,8 @@ export function ResetPasswordForm({ token }: { token?: string }) {
   }
 
   async function onSubmit(values: ResetPasswordValues) {
-    // TODO: POST { token, password: values.password } to the API
+    const result = await resetPassword(token as string, values.password)
+    if (!result.ok) return setError("password", { message: result.message })
     router.replace("/auth/sign-in")
   }
 

@@ -1,111 +1,121 @@
-import { generateTempPassword } from "./password-gen"
-import { limitToProfiles, normalizePermissions, type Permission } from "./permissions"
+import { api, toFail, ApiError, type Fail } from "./api"
+import type { CredentialsBody, MemberView, Permission } from "./api-types"
+import { mirrorMember, mirrorMembers, mirrorRemoved } from "./mock-bridge"
 import type { ProfileKind } from "./roles"
 import type { TeamMember } from "./team"
-import { teamStore, type MockMember } from "./team-store"
-import { RESERVED_USERNAMES } from "./validators"
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export type Owner = { alias: string; profiles: ProfileKind[] }
-export type ApiResult<T = void> = { ok: true; data: T } | { ok: false; message: string }
+export type ApiResult<T = void> = { ok: true; data: T } | Fail
 
-// Never expose the password field
-export const toPublic = (m: MockMember): TeamMember => ({
-  id: m.id,
-  account: m.account,
-  username: m.username,
-  displayName: m.displayName,
-  permissions: m.permissions,
-  status: m.status,
-  mustChangePassword: m.mustChangePassword,
-  createdAt: m.createdAt,
-  lastSignInAt: m.lastSignInAt,
-  email: m.email,
-  emailVerified: !!m.emailVerified,
-})
-
-const sanitize = (perms: Permission[], owner: Owner) =>
-  limitToProfiles(normalizePermissions(perms), owner.profiles)
+export function toTeamMember(v: MemberView, account: string): TeamMember {
+  return {
+    id: v.id,
+    account,
+    username: v.username,
+    displayName: v.name ?? undefined,
+    permissions: v.permissions,
+    status: v.status,
+    mustChangePassword: v.mustChangePassword,
+    tempPasswordExpiresAt: v.tempPasswordExpiresAt ?? undefined,
+    createdAt: v.createdAt,
+    lastSignInAt: v.lastSignInAt ?? undefined,
+    email: v.notificationEmail ?? undefined,
+    emailVerified: v.notificationEmailVerified,
+  }
+}
 
 export async function listTeam(owner: Owner): Promise<TeamMember[]> {
-  await sleep(250)
-  teamStore.setProfiles(owner.alias, owner.profiles) // mock only: the server derives this from the account
-  return teamStore
-    .list(owner.alias)
-    .map(toPublic)
-    .sort((a, b) => a.username.localeCompare(b.username))
+  try {
+    const { members } = await api<{ members: MemberView[] }>("/team")
+    const list = members.map((m) => toTeamMember(m, owner.alias))
+    mirrorMembers(owner.alias, owner.profiles, list)
+    return list
+  } catch (e) {
+    console.warn("listTeam failed", e)
+    return []
+  }
 }
 
 export async function getTeamMember(owner: Owner, id: string): Promise<TeamMember | null> {
-  await sleep(200)
-  teamStore.setProfiles(owner.alias, owner.profiles)
-  const m = teamStore.get(owner.alias, id)
-  return m ? toPublic(m) : null
+  try {
+    const { member } = await api<{ member: MemberView }>(`/team/${id}`)
+    return toTeamMember(member, owner.alias)
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status === 404)) console.warn("getTeamMember failed", e)
+    return null
+  }
 }
 
+/** The temporary password is in this response and nowhere else: show it once */
 export async function createTeamMember(
   owner: Owner,
-  input: { username: string; displayName?: string; permissions: Permission[] }
+  input: { username: string; displayName?: string; permissions: Permission[] },
 ): Promise<ApiResult<{ member: TeamMember; tempPassword: string }>> {
-  await sleep(500)
-  teamStore.setProfiles(owner.alias, owner.profiles)
-
-  const username = input.username.trim().toLowerCase()
-
-  if (RESERVED_USERNAMES.has(username)) return { ok: false, message: "Username ini tidak tersedia" }
-  
-  if (teamStore.find(owner.alias, username)) {
-    return { ok: false, message: "Username sudah dipakai di akun ini" }
+  try {
+    const r = await api<CredentialsBody>("/team", {
+      method: "POST",
+      json: {
+        username: input.username,
+        name: input.displayName?.trim() || undefined,
+        permissions: input.permissions,
+      },
+    })
+    const member = toTeamMember(r.member, owner.alias)
+    mirrorMember(member)
+    return { ok: true, data: { member, tempPassword: r.tempPassword } }
+  } catch (e) {
+    return toFail(e)
   }
-
-  const tempPassword = generateTempPassword()
-  const record: MockMember = {
-    id: crypto.randomUUID(),
-    account: owner.alias,
-    username,
-    displayName: input.displayName?.trim() || undefined,
-    permissions: sanitize(input.permissions, owner),
-    status: "active",
-    mustChangePassword: true,
-    createdAt: new Date().toISOString(),
-    password: tempPassword,
-    emailVerified: false,
-  }
-  teamStore.insert(record)
-  return { ok: true, data: { member: toPublic(record), tempPassword } }
 }
 
 export async function updateTeamMember(
   owner: Owner,
   id: string,
-  patch: { displayName?: string; permissions?: Permission[]; status?: TeamMember["status"] }
+  patch: { displayName?: string; permissions?: Permission[]; status?: TeamMember["status"] },
 ): Promise<ApiResult<TeamMember>> {
-  await sleep(400)
-  const next: Partial<MockMember> = {}
-  if (patch.displayName !== undefined) next.displayName = patch.displayName.trim() || undefined
-  if (patch.permissions) next.permissions = sanitize(patch.permissions, owner)
-  if (patch.status) next.status = patch.status
+  try {
+    let view: MemberView | null = null
 
-  const updated = teamStore.update(owner.alias, id, next)
-  return updated ? { ok: true, data: toPublic(updated) } : { ok: false, message: "Anggota tidak ditemukan" }
+    if (patch.displayName !== undefined || patch.permissions) {
+      const json: { name?: string; permissions?: Permission[] } = {}
+      if (patch.displayName !== undefined) json.name = patch.displayName
+      if (patch.permissions) json.permissions = patch.permissions
+      view = (await api<{ member: MemberView }>(`/team/${id}`, { method: "PATCH", json })).member
+    }
+    if (patch.status) {
+      const action = patch.status === "active" ? "enable" : "disable"
+      view = (await api<{ member: MemberView }>(`/team/${id}/${action}`, { method: "POST" })).member
+    }
+    view ??= (await api<{ member: MemberView }>(`/team/${id}`)).member
+
+    const member = toTeamMember(view, owner.alias)
+    mirrorMember(member)
+    return { ok: true, data: member }
+  } catch (e) {
+    return toFail(e)
+  }
 }
 
 export async function resetMemberPassword(
   owner: Owner,
-  id: string
+  id: string,
 ): Promise<ApiResult<{ member: TeamMember; tempPassword: string }>> {
-  await sleep(400)
-  const tempPassword = generateTempPassword()
-  const updated = teamStore.update(owner.alias, id, { password: tempPassword, mustChangePassword: true })
-  return updated
-    ? { ok: true, data: { member: toPublic(updated), tempPassword } }
-    : { ok: false, message: "Anggota tidak ditemukan" }
+  try {
+    const r = await api<CredentialsBody>(`/team/${id}/reset-password`, { method: "POST" })
+    const member = toTeamMember(r.member, owner.alias)
+    mirrorMember(member)
+    return { ok: true, data: { member, tempPassword: r.tempPassword } }
+  } catch (e) {
+    return toFail(e)
+  }
 }
 
 export async function deleteTeamMember(owner: Owner, id: string): Promise<ApiResult> {
-  await sleep(400)
-  return teamStore.remove(owner.alias, id)
-    ? { ok: true, data: undefined }
-    : { ok: false, message: "Anggota tidak ditemukan" }
+  try {
+    await api(`/team/${id}`, { method: "DELETE" })
+    mirrorRemoved(owner.alias, id)
+    return { ok: true, data: undefined }
+  } catch (e) {
+    return toFail(e)
+  }
 }

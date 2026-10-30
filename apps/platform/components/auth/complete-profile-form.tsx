@@ -1,22 +1,26 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { slugifyAlias } from "@/lib/alias"
-import { homeFor, storeSession, useSession } from "@/lib/auth"
-import { completeRootProfile } from "@/lib/auth-api"
-import { buildProfilePayload } from "@/lib/profile-payload"
+import { applyServerSession, getSession, homeFor, setPreferredMode, useSession } from "@/lib/auth"
+import { completeProfile } from "@/lib/auth-api"
+import { applyFieldErrors } from "@/lib/form-errors"
+import { profileInput } from "@/lib/profile-payload"
 import { completeProfileSchema, type CompleteProfileValues } from "@/lib/validators"
 import { AccountKindField } from "./account-kind-field"
 import { AliasField } from "./alias-field"
 import { ProfileFields } from "./profile-fields"
+import { ServerError } from "./server-error"
 import { TermsCheckbox } from "./terms-checkbox"
 
 export function CompleteProfileForm() {
   const router = useRouter()
   const session = useSession()
+  const [serverError, setServerError] = useState<string | null>(null)
 
   const name = session?.type === "root" ? session.name : undefined
 
@@ -36,33 +40,24 @@ export function CompleteProfileForm() {
   })
 
   async function onSubmit(v: CompleteProfileValues) {
-    if (session?.type !== "root") return
+    setServerError(null)
+    const result = await completeProfile({ accountAlias: v.accountAlias, acceptTerms: true, ...profileInput(v) })
 
-    const result = await completeRootProfile(buildProfilePayload(v))
     if (!result.ok) {
-      form.setError("accountAlias", { message: result.message })
+      if (!applyFieldErrors(form.setError, result.fields, Object.keys(v))) setServerError(result.message)
       return
     }
 
-    // First profile created → drop the pending step and activate it
-    const next = {
-      type: "root" as const,
-      email: session.email,
-      name: session.name,
-      alias: v.accountAlias,
-      profiles: [v.kind],
-      mode: v.kind,
-    }
-    storeSession(next)
-    router.replace(homeFor(next))
+    applyServerSession(result.session)
+    setPreferredMode(v.kind)
+    const next = getSession()
+    router.replace(next ? homeFor(next) : "/")
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold text-slate-900">
-          Halo{name ? `, ${name}` : ""}!
-        </h1>
+        <h1 className="font-heading text-3xl font-bold text-slate-900">Halo{name ? `, ${name}` : ""}!</h1>
         <p className="mt-1 text-sm text-slate-600">
           Lengkapi data akun Anda untuk mulai menggunakan Routing.com.
         </p>
@@ -70,6 +65,7 @@ export function CompleteProfileForm() {
 
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
+          <ServerError message={serverError} />
           <AccountKindField />
           <AliasField />
           <ProfileFields />

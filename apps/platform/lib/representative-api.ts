@@ -2,7 +2,7 @@ import { logEvent } from "./audit"
 import type { DocMeta } from "./kyc"
 import { getKycSummary } from "./kyc-api"
 import { readJson, writeJson } from "./mock-db"
-import { grant, revoke } from "./permissions"
+import { mockGrant, mockRevoke } from "./mock-bridge"
 import type { ProfileKind } from "./roles"
 import type { ApiResult, Owner } from "./team-api"
 import { teamStore } from "./team-store"
@@ -32,7 +32,7 @@ function save(alias: string, list: Representative[]) {
 function releaseSigning(alias: string, username: string, remaining: Representative[]) {
   if (remaining.some((r) => r.username === username)) return
   const m = teamStore.find(alias, username)
-  if (m) teamStore.update(alias, m.id, { permissions: revoke(m.permissions, "contracts:sign") })
+  if (m) teamStore.update(alias, m.id, { permissions: mockRevoke(m.permissions, "contracts:sign") })
 }
 
 export async function listRepresentatives(alias: string): Promise<Representative[]> {
@@ -71,7 +71,7 @@ export async function designateRepresentative(
   ]
   save(owner.alias, next)
 
-  teamStore.update(owner.alias, m.id, { permissions: grant(m.permissions, "contracts:sign") })
+  teamStore.update(owner.alias, m.id, { permissions: mockGrant(m.permissions, "contracts:sign") })
   if (previous && previous.username !== m.username) releaseSigning(owner.alias, previous.username, next)
 
   logEvent(owner.alias, actorLabel, "representative_set", `${input.kind === "talent" ? "Talent" : "Client"}: ${m.username} (berlaku ${input.since})`)

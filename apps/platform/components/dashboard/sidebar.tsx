@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { LogOut, X } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { clearSession, useSession } from "@/lib/auth"
+import { signOut, useSession } from "@/lib/auth"
 import { NAV_BY_MODE, SHARED_NAV, type NavItem } from "@/lib/nav-config"
 import { can } from "@/lib/permissions"
 import { useActiveMode } from "@/lib/use-active-mode"
@@ -118,8 +118,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <button
         type="button"
-        onClick={() => {
-          clearSession()
+        onClick={async () => {
+          await signOut()
           router.replace("/auth/sign-in")
         }}
         className="mt-auto flex items-center gap-3 px-6 py-4 text-[15px] text-slate-700 hover:bg-slate-50"

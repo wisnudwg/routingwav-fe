@@ -65,5 +65,17 @@ export const teamStore = {
     db.profiles[alias] = profiles
     write(db)
   },
+  replaceAll(alias: string, members: MockMember[]) {
+    const db = read()
+    db.members = [...db.members.filter((m) => m.account !== alias), ...members]
+    write(db)
+  },
+  upsert(m: MockMember) {
+    const db = read()
+    const i = db.members.findIndex((x) => x.account === m.account && x.username === m.username)
+    if (i >= 0) db.members[i] = { ...db.members[i]!, ...m, id: db.members[i]!.id }
+    else db.members.push(m)
+    write(db)
+  },
   findByEmailToken: (token: string) => read().members.find((m) => m.emailToken === token) ?? null,
 }

@@ -9,7 +9,7 @@ import { FormField } from "@/components/auth/form-field"
 import { ContactFields } from "@/components/auth/profile-fields"
 import { NoOwner } from "@/components/team/team-view"
 import { getAccountProfile, updateAccountProfile } from "@/lib/account-api"
-import { displayName, storeSession, useSession } from "@/lib/auth"
+import { displayName, useSession } from "@/lib/auth"
 import { accountProfileSchema, type AccountProfileValues } from "@/lib/validators"
 import { MockNotice } from "./mock-notice"
 
@@ -61,7 +61,6 @@ export function AccountProfileForm() {
     setNotice(null)
     const res = await updateAccountProfile(alias, root.email, values)
     if (!res.ok) return setNotice(res.message)
-    storeSession({ ...root, name: values.name.trim() }) // the header reflects the new name
     reset(values)
     setNotice("Perubahan disimpan.")
   }

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { getRememberedAccount, homeFor, rememberAccount, storeSession } from "@/lib/auth"
+import { applyServerSession, getRememberedAccount, getSession, homeFor, rememberAccount } from "@/lib/auth"
 import { signInIam } from "@/lib/auth-api"
 import { iamSignInSchema, type IamSignInValues } from "@/lib/validators"
 import { FormField } from "./form-field"
@@ -41,8 +41,9 @@ export function IamSignIn({ initialAccount }: { initialAccount?: string }) {
     if (!result.ok) return setServerError(result.message)
 
     rememberAccount(values.remember ? account : null)
-    storeSession(result.session)
-    router.replace(homeFor(result.session))
+    applyServerSession(result.session)
+    const next = getSession()
+    router.replace(next ? homeFor(next) : "/")
   }
 
   return (

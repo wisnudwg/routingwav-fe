@@ -7,9 +7,9 @@ import { FormProvider, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { RoleFields } from "@/components/auth/profile-fields"
-import { addProfileToSession, useSession } from "@/lib/auth"
+import { applyServerSession, setPreferredMode, useSession } from "@/lib/auth"
 import { addProfile } from "@/lib/auth-api"
-import { buildProfile } from "@/lib/profile-payload"
+import { roleInput } from "@/lib/profile-payload"
 import { KIND_INFO, PROFILE_KINDS } from "@/lib/roles"
 import { DASHBOARD_HOME } from "@/lib/routes"
 import { addProfileSchema, type AddProfileValues } from "@/lib/validators"
@@ -40,13 +40,14 @@ export function AddProfileForm() {
   }
 
   async function onSubmit(v: AddProfileValues) {
-    const result = await addProfile(buildProfile(v))
+    const result = await addProfile(roleInput(v))
     if (!result.ok) {
       form.setError("roles", { message: result.message })
       return
     }
     setDone(true) // avoids a flash of the "you already have both" state
-    addProfileToSession(v.kind) // adds the profile and makes it active
+    applyServerSession(result.session)
+    setPreferredMode(v.kind)
     router.replace(DASHBOARD_HOME[v.kind])
   }
 

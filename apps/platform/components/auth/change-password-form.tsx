@@ -5,8 +5,8 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
-import { clearSession, homeFor, storeSession, useSession } from "@/lib/auth"
-import { changeIamPassword } from "@/lib/auth-api"
+import { applyServerSession, getSession, homeFor, signOut, useSession } from "@/lib/auth"
+import { changePassword } from "@/lib/auth-api"
 import { changePasswordSchema, type NewPasswordValues } from "@/lib/validators"
 import { FormField } from "./form-field"
 import { PasswordInput } from "./password-input"
@@ -24,19 +24,17 @@ export function ChangePasswordForm() {
   } = useForm<NewPasswordValues>({ resolver: zodResolver(changePasswordSchema) })
 
   async function onSubmit(v: NewPasswordValues) {
-    if (session?.type !== "iam") return
     setServerError(null)
-
-    const result = await changeIamPassword(session.account, session.username, v.password)
+    const result = await changePassword(v.password)
     if (!result.ok) return setServerError(result.message)
 
-    const next = { ...session, pending: undefined }
-    storeSession(next)
-    router.replace(homeFor(next))
+    applyServerSession(result.session)
+    const next = getSession()
+    router.replace(next ? homeFor(next) : "/")
   }
 
-  function cancel() {
-    clearSession()
+  async function cancel() {
+    await signOut()
     router.replace("/auth/sign-in")
   }
 

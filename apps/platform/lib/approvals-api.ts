@@ -16,7 +16,7 @@ import {
   delegationChanged,
   withdrawalProcessed,
 } from "./notify-events"
-import { grant } from "./permissions"
+import { mockGrant } from "./mock-bridge"
 import type { ApiResult, Owner } from "./team-api"
 import { teamStore } from "./team-store"
 import { executeWithdrawal } from "./wallet-api"
@@ -201,7 +201,7 @@ export async function saveDelegation(
     createdAt: new Date().toISOString(),
   })
   // A delegate must be able to open the Approvals page
-  teamStore.update(owner.alias, m.id, { permissions: grant(m.permissions, "approvals:view") })
+  teamStore.update(owner.alias, m.id, { permissions: mockGrant(m.permissions, "approvals:view") })
 
   logEvent(
     owner.alias,

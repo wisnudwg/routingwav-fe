@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { homeFor, storeSession } from "@/lib/auth"
+import { applyServerSession, getSession, homeFor } from "@/lib/auth"
 import { signInRoot } from "@/lib/auth-api"
 import { signInSchema, type SignInValues } from "@/lib/validators"
 import { FormField } from "./form-field"
@@ -34,11 +34,12 @@ export function RootSignIn() {
     const result = await signInRoot(values.email, values.password)
     if (!result.ok) {
       setServerError(result.message)
-      if (result.code === "email_unverified") setUnverifiedEmail(values.email.trim().toLowerCase())
+      if (result.code === "EMAIL_UNVERIFIED") setUnverifiedEmail(values.email.trim().toLowerCase())
       return
     }
-    storeSession(result.session)
-    router.replace(homeFor(result.session))
+    applyServerSession(result.session)
+    const next = getSession()
+    router.replace(next ? homeFor(next) : "/")
   }
 
   return (
