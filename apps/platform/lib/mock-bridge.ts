@@ -7,6 +7,12 @@ import { teamStore, type MockMember } from "./team-store"
 
 const dev = () => process.env.NODE_ENV !== "production"
 const toMock = (m: TeamMember): MockMember => ({ ...m, password: "" })
+const ownerNames = new Map<string, string>()
+
+/** DEV ONLY: stands in for the account display name the real Messages module will get from the server */
+export async function getAccountProfile(alias: string): Promise<{ name?: string }> {
+  return { name: ownerNames.get(alias) ?? alias }
+}
 
 export function mirrorSession(view: SessionView) {
   if (!dev()) return
@@ -14,6 +20,7 @@ export function mirrorSession(view: SessionView) {
     if (view.alias) {
       notificationsStore.setOwnerEmail(view.alias, view.email)
       teamStore.setProfiles(view.alias, view.profiles)
+      ownerNames.set(view.alias, view.name ?? view.alias)
     }
     return
   }

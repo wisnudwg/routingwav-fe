@@ -10,6 +10,9 @@ type TeamListBody = Json<paths["/v1/team"]["get"]["responses"][200]>
 export type MemberView = TeamListBody["members"][number]
 export type CredentialsBody = Json<paths["/v1/team"]["post"]["responses"][201]>
 export type Permission = PermissionsMeta["permissions"][number]["id"]
+export type AccountProfile = Json<paths["/v1/account/profile"]["get"]["responses"][200]>["profile"]
+export type ActivityPage = Json<paths["/v1/account/activity"]["get"]["responses"][200]>
+export type ActivityEvent = ActivityPage["events"][number]
 
 /* ---- hand-written: auth endpoints aren't in the OpenAPI document (small, stable payloads) ---- */
 export type EmailStatus = { state: "none" } | { state: "pending" | "verified"; masked: string }

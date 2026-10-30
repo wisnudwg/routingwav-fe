@@ -1,4 +1,4 @@
-import { getAccountProfile } from "./account-api"
+import { getAccountProfile } from "./mock-bridge"
 import { requesterKey, type Actor } from "./approvals"
 import { logEvent } from "./audit"
 import { deleteBlob, getBlob, putBlob } from "./audio-blob-store"

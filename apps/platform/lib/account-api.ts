@@ -1,45 +1,24 @@
-import { logEvent } from "./audit"
-import { readJson, writeJson } from "./mock-db"
-import type { ApiResult } from "./team-api"
-import type { AccountProfileValues } from "./validators"
+import { api, toFail, type Fail } from "./api"
+import type { AccountProfile } from "./api-types"
 
-export type AccountProfile = AccountProfileValues
+export type { AccountProfile }
+export type AccountProfileInput = Pick<AccountProfile, "name" | "phoneCountry" | "phoneNumber" | "country" | "address">
+type Result = { ok: true; data: AccountProfile } | Fail
 
-const KEY = "mock:account:v1"
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-const FIELD_LABEL: Record<keyof AccountProfile, string> = {
-  name: "Nama",
-  phoneCountry: "Kode telepon",
-  phoneNumber: "Nomor telepon",
-  country: "Negara",
-  address: "Alamat",
+export async function getAccountProfile(): Promise<Result> {
+  try {
+    const r = await api<{ profile: AccountProfile }>("/account/profile")
+    return { ok: true, data: r.profile }
+  } catch (e) {
+    return toFail(e)
+  }
 }
 
-type Db = Record<string, AccountProfile>
-
-export async function getAccountProfile(alias: string): Promise<AccountProfile | null> {
-  await sleep(200)
-  return readJson<Db>(KEY, {})[alias] ?? null
-}
-
-export async function updateAccountProfile(
-  alias: string,
-  actor: string,
-  values: AccountProfile
-): Promise<ApiResult> {
-  await sleep(400)
-  // TODO: the server requires account:manage and re-validates everything.
-  const db = readJson<Db>(KEY, {})
-  const prev = db[alias]
-  const next: AccountProfile = { ...values, name: values.name.trim(), address: values.address.trim() }
-
-  const changed = (Object.keys(FIELD_LABEL) as (keyof AccountProfile)[]).filter(
-    (k) => !prev || prev[k] !== next[k]
-  )
-  db[alias] = next
-  writeJson(KEY, db)
-
-  if (changed.length) logEvent(alias, actor, "profile_updated", changed.map((k) => FIELD_LABEL[k]).join(", "))
-  return { ok: true, data: undefined }
+export async function updateAccountProfile(input: AccountProfileInput): Promise<Result> {
+  try {
+    const r = await api<{ profile: AccountProfile }>("/account/profile", { method: "PUT", json: input })
+    return { ok: true, data: r.profile }
+  } catch (e) {
+    return toFail(e)
+  }
 }
