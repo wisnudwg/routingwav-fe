@@ -134,7 +134,7 @@ export function validateFile(file: File, kind: DocKind): string | null {
   return null
 }
 
-export type DocMeta = { name: string; size: number; type: string; uploadedAt: string }
+export type DocMeta = { name: string; size: number; type: string; uploadedAt: string; id?: string }
 
 /* ---------- form ---------- */
 
@@ -192,6 +192,13 @@ export type KycSummary = {
   submittedAt?: string
   decidedAt?: string
   rejectionReason?: string
+  /** A verified identity stays in force while an update is under review */
+  updatePending?: boolean
+  updateRejection?: { reason: string; at: string }
+  /** Quote this when contacting support */
+  reference?: string
+  /** Some providers need the person to finish a step on their own page */
+  action?: { url: string; expiresAt: string }
   names: { fullName?: string; legalName?: string; entityType?: string; repName?: string }
   masked: Partial<Record<IdField, string>>
   docs: Partial<Record<DocKind, DocMeta>>

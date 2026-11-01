@@ -21,6 +21,7 @@ const CATEGORIES: { value: ActivityCategory; label: string }[] = [
   { value: "auth", label: "Masuk & keamanan" },
   { value: "team", label: "Tim" },
   { value: "account", label: "Akun" },
+  { value: "kyc", label: "Identitas" },
 ]
 
 type State = { category: ActivityCategory; events: ActivityEvent[]; next: string | null; error: string | null }

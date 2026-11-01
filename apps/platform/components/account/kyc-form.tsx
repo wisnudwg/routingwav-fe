@@ -18,10 +18,10 @@ import {
   kycSchema,
   validateFile,
   type DocKind,
-  type DocMeta,
   type KycFormValues,
   type KycSummary,
 } from "@/lib/kyc"
+import { applyFieldErrors } from "@/lib/form-errors"
 import { submitKyc } from "@/lib/kyc-api"
 import { DocumentInput } from "./document-input"
 import { MockNotice } from "./mock-notice"
@@ -38,14 +38,10 @@ function nikHint(value: string) {
 }
 
 export function KycForm({
-  alias,
-  actor,
   initial,
   onSubmitted,
   onCancel,
 }: {
-  alias: string
-  actor: string
   initial?: KycSummary
   onSubmitted: () => void
   onCancel?: () => void
@@ -59,6 +55,7 @@ export function KycForm({
     handleSubmit,
     watch,
     setValue,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<KycFormValues>({
     resolver: zodResolver(kycSchema),
@@ -102,26 +99,28 @@ export function KycForm({
   async function onSubmit(values: KycFormValues) {
     setServerError(null)
 
-    const docs: Partial<Record<DocKind, DocMeta>> = {}
+    const picked: Partial<Record<DocKind, File>> = {}
     const missing: Partial<Record<DocKind, string>> = {}
     for (const { kind, required } of DOCS_BY_TYPE[values.type]) {
       const f = files[kind]
-      if (f) docs[kind] = { name: f.name, size: f.size, type: f.type, uploadedAt: new Date().toISOString() }
+      if (f) picked[kind] = f
       else if (required) missing[kind] = "Dokumen wajib diunggah"
     }
     setFileErrors(missing)
     if (Object.keys(missing).length > 0) return
 
-    // TODO (real backend): request presigned URLs, upload the files to private storage,
-    // then submit the metadata. Files never pass through this app's server.
-    const res = await submitKyc(alias, actor, { values, docs })
-    if (!res.ok) return setServerError(res.message)
+    // Files go straight to storage, then the form data is submitted with their ids
+    const res = await submitKyc(values, picked)
+    if (!res.ok) {
+      if (!applyFieldErrors(setError, res.fields, Object.keys(values))) setServerError(res.message)
+      return
+    }
     onSubmitted()
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
-      <MockNotice />
+      {/* <MockNotice /> */}
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-slate-800">Jenis akun</legend>
@@ -237,6 +236,10 @@ export function KycForm({
       </div>
 
       <ServerError message={serverError} />
+
+      {isSubmitting && (
+        <p role="status" className="text-xs text-slate-500">Mengunggah dokumen dan mengirim data…</p>
+      )}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={isSubmitting}>Ajukan verifikasi</Button>

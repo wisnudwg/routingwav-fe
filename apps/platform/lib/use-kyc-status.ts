@@ -8,25 +8,28 @@ import { getKycStatus, KYC_EVENT } from "./kyc-api"
 /** null = unknown, still loading, or signed out */
 export function useKycStatus(): KycStatus | null {
   const session = useSession()
-  const alias = session ? (session.type === "root" ? session.alias : session.account) : undefined
-  const [state, setState] = useState<{ alias: string; status: KycStatus } | null>(null)
+  const key = session ? (session.type === "root" ? session.email : `${session.username}@${session.account}`) : undefined
+  const [state, setState] = useState<{ key: string; status: KycStatus | null } | null>(null)
 
   useEffect(() => {
-    if (!alias) return
+    if (!key) return
     let cancelled = false
     const load = () =>
-      getKycStatus(alias).then((status) => {
-        if (!cancelled) setState({ alias, status })
+      getKycStatus().then((status) => {
+        if (!cancelled) setState({ key, status })
       })
-    load()
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load()
+    }
+    void load()
     window.addEventListener(KYC_EVENT, load)
-    window.addEventListener("storage", load)
+    document.addEventListener("visibilitychange", onVisible)
     return () => {
       cancelled = true
       window.removeEventListener(KYC_EVENT, load)
-      window.removeEventListener("storage", load)
+      document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [alias])
+  }, [key])
 
-  return state && state.alias === alias ? state.status : null
+  return state && state.key === key ? state.status : null
 }

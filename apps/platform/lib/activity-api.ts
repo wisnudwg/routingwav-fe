@@ -2,7 +2,7 @@ import { api, toFail, type Fail } from "./api"
 import type { ActivityPage } from "./api-types"
 
 export type { ActivityEvent } from "./api-types"
-export type ActivityCategory = "all" | "auth" | "team" | "account"
+export type ActivityCategory = "all" | "auth" | "team" | "account" | "kyc"
 
 export async function fetchActivity(
   category: ActivityCategory,

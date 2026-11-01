@@ -3,96 +3,55 @@
 import { useEffect, useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@workspace/ui/components/button"
-import { PasswordInput } from "@/components/auth/password-input"
 import { ServerError } from "@/components/auth/server-error"
+import { ApiError } from "@/lib/api"
 import { useSession } from "@/lib/auth"
 import { formatBytes, formatDateTime } from "@/lib/format"
-import { DOC_SPECS, ID_LABEL, formatId, type DocKind, type DocMeta, type IdField, type KycSummary } from "@/lib/kyc"
-import { openDocument, revealIdentity, stepUp } from "@/lib/kyc-api"
+import { DOC_SPECS, ID_LABEL, formatId, type DocKind, type IdField, type KycSummary } from "@/lib/kyc"
+import { revealIdentity, viewDocument } from "@/lib/kyc-api"
 import { can } from "@/lib/permissions"
+import { StepUpPrompt } from "./step-up-prompt"
 
-type Target = { kind: "field"; field: IdField } | { kind: "doc"; doc: DocKind }
+type Target = { kind: "field"; field: IdField } | { kind: "doc"; doc: DocKind; id: string }
+type Viewing = { kind: DocKind; url: string; contentType: string }
 
-const ELEVATION_MS = 5 * 60_000 // one password check unlocks reveals for 5 minutes
-const AUTO_HIDE_MS = 60_000 // revealed values hide again after 60 seconds
+const AUTO_HIDE_MS = 60_000 // revealed values and open documents hide again after a minute
 
-export function IdentitySummary({
-  summary,
-  alias,
-  actor,
-}: {
-  summary: KycSummary
-  alias: string
-  actor: string
-}) {
+export function IdentitySummary({ summary }: { summary: KycSummary }) {
   const session = useSession()
   const canReveal = !!session && can(session, "identity:reveal")
 
-  const [elevatedUntil, setElevatedUntil] = useState(0)
   const [revealed, setRevealed] = useState<Partial<Record<IdField, string>>>({})
-  const [openedDoc, setOpenedDoc] = useState<DocKind | null>(null)
+  const [viewing, setViewing] = useState<Viewing | null>(null)
   const [pending, setPending] = useState<Target | null>(null)
-  const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
-  // Re-mask everything after a minute
   useEffect(() => {
-    if (Object.keys(revealed).length === 0 && !openedDoc) return
+    if (Object.keys(revealed).length === 0 && !viewing) return
     const t = setTimeout(() => {
       setRevealed({})
-      setOpenedDoc(null)
+      setViewing(null)
     }, AUTO_HIDE_MS)
     return () => clearTimeout(t)
-  }, [revealed, openedDoc])
+  }, [revealed, viewing])
 
   async function run(t: Target) {
-    if (t.kind === "field") {
-      const res = await revealIdentity(alias, actor, t.field)
-      if (res.ok) setRevealed((r) => ({ ...r, [t.field]: res.data }))
-      else setError(res.message)
-    } else {
-      const res = await openDocument(alias, actor, t.doc)
-      if (res.ok) setOpenedDoc(t.doc)
-      else setError(res.message)
-    }
-  }
-
-  function request(t: Target) {
     setError(null)
-    if (Date.now() < elevatedUntil) {
-      void run(t)
-      return
+    try {
+      if (t.kind === "field") {
+        const value = await revealIdentity(t.field)
+        setRevealed((r) => ({ ...r, [t.field]: value }))
+      } else {
+        const v = await viewDocument(t.id)
+        setViewing({ kind: t.doc, url: v.url, contentType: v.contentType })
+      }
+      setPending(null)
+    } catch (e) {
+      // The server decides whether the password was confirmed recently enough
+      if (e instanceof ApiError && e.code === "STEP_UP_REQUIRED") return setPending(t)
+      setPending(null)
+      setError(e instanceof ApiError ? e.message : "Terjadi kesalahan.")
     }
-    setPending(t)
-    setPassword("")
-  }
-
-  async function confirm(e: React.FormEvent) {
-    e.preventDefault()
-    if (!pending) return
-    setBusy(true)
-    setError(null)
-
-    if (!(await stepUp(password))) {
-      setBusy(false)
-      setError("Password salah.")
-      return
-    }
-    setElevatedUntil(Date.now() + ELEVATION_MS)
-    const target = pending
-    setPending(null)
-    setPassword("")
-    await run(target)
-    setBusy(false)
-  }
-
-  function hide(field: IdField) {
-    setRevealed((r) => {
-      const next = { ...r }
-      delete next[field]
-      return next
-    })
   }
 
   const idFields: IdField[] = summary.type === "business" ? ["nib", "npwp", "repNik"] : ["nik", "npwp"]
@@ -104,7 +63,7 @@ export function IdentitySummary({
           ["Penanggung jawab", summary.names.repName],
         ]
       : [["Nama sesuai KTP", summary.names.fullName]]
-  const docs = Object.entries(summary.docs) as [DocKind, DocMeta][]
+  const docs = Object.entries(summary.docs) as [DocKind, NonNullable<KycSummary["docs"][DocKind]>][]
 
   return (
     <div className="space-y-6">
@@ -128,11 +87,11 @@ export function IdentitySummary({
               </div>
               {canReveal &&
                 (value ? (
-                  <Button variant="ghost" size="sm" onClick={() => hide(f)} className="gap-1.5">
+                  <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setRevealed((r) => ({ ...r, [f]: undefined }))}>
                     <EyeOff className="size-4" aria-hidden /> Sembunyikan
                   </Button>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => request({ kind: "field", field: f })} className="gap-1.5">
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void run({ kind: "field", field: f })}>
                     <Eye className="size-4" aria-hidden /> Tampilkan
                   </Button>
                 ))}
@@ -153,17 +112,25 @@ export function IdentitySummary({
                     {meta.name} · {formatBytes(meta.size)} · {formatDateTime(meta.uploadedAt)}
                   </p>
                 </div>
-                {canReveal && (
-                  <Button variant="outline" size="sm" onClick={() => request({ kind: "doc", doc: kind })}>
+                {canReveal && meta.id && (
+                  <Button variant="outline" size="sm" onClick={() => void run({ kind: "doc", doc: kind, id: meta.id as string })}>
                     Lihat
                   </Button>
                 )}
               </div>
-              {openedDoc === kind && (
-                <div className="rounded-md bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
-                  Simulasi: di produksi, dokumen tampil lewat tautan bertanda air (nama pengakses dan
-                  waktu) yang berlaku 60 detik, tanpa tombol unduh.{" "}
-                  <button type="button" onClick={() => setOpenedDoc(null)} className="text-brand hover:underline">
+
+              {viewing?.kind === kind && (
+                <div className="space-y-2 rounded-md bg-slate-50 p-3">
+                  {viewing.contentType === "application/pdf" ? (
+                    <a href={viewing.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand hover:underline">
+                      Buka PDF di tab baru
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={viewing.url} alt={DOC_SPECS[kind].label} referrerPolicy="no-referrer" className="max-h-96 rounded-md border" />
+                  )}
+                  <p className="text-xs text-slate-500">Tautan ini berlaku 60 detik, lalu dokumen disembunyikan lagi.</p>
+                  <button type="button" onClick={() => setViewing(null)} className="text-xs text-brand hover:underline">
                     Tutup
                   </button>
                 </div>
@@ -174,22 +141,14 @@ export function IdentitySummary({
       </section>
 
       {pending && (
-        <form onSubmit={confirm} className="space-y-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
-          <p className="text-sm text-slate-800">
-            Masukkan password Anda untuk melihat data identitas. Akses ini dicatat di log aktivitas.
-          </p>
-          <PasswordInput
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            aria-label="Password"
-            autoFocus
-          />
-          <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={busy}>Konfirmasi</Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setPending(null)}>Batal</Button>
-          </div>
-        </form>
+        <StepUpPrompt
+          onCancel={() => setPending(null)}
+          onConfirmed={() => {
+            const t = pending
+            setPending(null)
+            void run(t)
+          }}
+        />
       )}
 
       <ServerError message={error} />

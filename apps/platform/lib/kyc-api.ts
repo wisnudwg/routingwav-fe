@@ -1,173 +1,164 @@
-import { logEvent } from "./audit"
-import {
-  DOCS_BY_TYPE,
-  DOC_SPECS,
-  ID_LABEL,
-  kycSchema,
-  maskId,
-  type AccountType,
-  type DocKind,
-  type DocMeta,
-  type IdField,
-  type KycFormValues,
-  type KycStatus,
-  type KycSummary,
-} from "./kyc"
-import { readJson, writeJson } from "./mock-db"
-import type { ApiResult } from "./team-api"
-import { kycDecided } from "./notify-events"
+import { api, ApiError, toFail, type Fail } from "./api"
+import type { AccountType, DocKind, IdField, KycFormValues, KycStatus, KycSummary } from "./kyc"
 
-// DEV ONLY. This stores full identity numbers in localStorage so the UI can be exercised.
-// A real backend stores them encrypted, returns them only via the reveal endpoint, and
-// never to the browser otherwise.
-
-const KEY = "mock:kyc:v1"
 export const KYC_EVENT = "kyc-change"
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-const NOT_AVAILABLE = "Verifikasi identitas belum tersedia."
-const isProd = () => process.env.NODE_ENV === "production"
+const emit = () => window.dispatchEvent(new Event(KYC_EVENT))
 
-type Stored = {
+type ApiSummary = {
   status: KycStatus
-  type: AccountType
-  data: Omit<KycFormValues, "consent" | "type">
-  docs: Partial<Record<DocKind, DocMeta>>
-  submittedAt: string
-  decidedAt?: string
-  rejectionReason?: string
-}
-type Db = Record<string, Stored>
-
-const read = () => readJson<Db>(KEY, {})
-
-function save(alias: string, rec: Stored) {
-  const db = read()
-  db[alias] = rec
-  writeJson(KEY, db)
-  window.dispatchEvent(new Event(KYC_EVENT))
+  updatePending: boolean
+  updateRejection: { reason: string; at: string } | null
+  type: AccountType | null
+  submittedAt: string | null
+  decidedAt: string | null
+  rejectionReason: string | null
+  reference: string | null
+  names: { fullName: string | null; legalName: string | null; entityType: string | null; repName: string | null }
+  masked: Record<string, string>
+  docs: { id: string; kind: DocKind; name: string; size: number; contentType: string; uploadedAt: string }[]
+  action: { type: "redirect"; url: string; expiresAt: string } | null
 }
 
-function summarize(rec: Stored | undefined): KycSummary {
-  if (!rec) return { status: "not_started", names: {}, masked: {}, docs: {} }
-  const d = rec.data
-  const fields: IdField[] = rec.type === "business" ? ["nib", "npwp", "repNik"] : ["nik", "npwp"]
-  const masked: Partial<Record<IdField, string>> = {}
-  for (const f of fields) if (d[f]) masked[f] = maskId(d[f])
+const EMPTY: KycSummary = { status: "not_started", names: {}, masked: {}, docs: {} }
 
+function toSummary(s: ApiSummary): KycSummary {
   return {
-    status: rec.status,
-    type: rec.type,
-    submittedAt: rec.submittedAt,
-    decidedAt: rec.decidedAt,
-    rejectionReason: rec.rejectionReason,
+    status: s.status,
+    type: s.type ?? undefined,
+    submittedAt: s.submittedAt ?? undefined,
+    decidedAt: s.decidedAt ?? undefined,
+    rejectionReason: s.rejectionReason ?? undefined,
+    updatePending: s.updatePending,
+    updateRejection: s.updateRejection ?? undefined,
+    reference: s.reference ?? undefined,
+    action: s.action ? { url: s.action.url, expiresAt: s.action.expiresAt } : undefined,
     names: {
-      fullName: d.fullName || undefined,
-      legalName: d.legalName || undefined,
-      entityType: d.entityType || undefined,
-      repName: d.repName || undefined,
+      fullName: s.names.fullName ?? undefined,
+      legalName: s.names.legalName ?? undefined,
+      entityType: s.names.entityType ?? undefined,
+      repName: s.names.repName ?? undefined,
     },
-    masked,
-    docs: rec.docs,
+    masked: s.masked as KycSummary["masked"],
+    docs: Object.fromEntries(
+      s.docs.map((d) => [d.kind, { id: d.id, name: d.name, size: d.size, type: d.contentType, uploadedAt: d.uploadedAt }]),
+    ),
   }
 }
 
-export async function getKycSummary(alias: string): Promise<KycSummary> {
-  await sleep(200)
-  return summarize(read()[alias])
+export async function loadKycSummary(): Promise<{ ok: true; summary: KycSummary } | Fail> {
+  try {
+    return { ok: true, summary: toSummary(await api<ApiSummary>("/kyc")) }
+  } catch (e) {
+    return toFail(e)
+  }
 }
 
-/** Safe for everyone in the account, including team members: status only */
-export async function getKycStatus(alias: string): Promise<KycStatus> {
-  await sleep(100)
-  return read()[alias]?.status ?? "not_started"
+/** For modules that only need the data and treat "unknown" like "not verified". The server derives the account. */
+export async function getKycSummary(_alias?: string): Promise<KycSummary> {
+  const r = await loadKycSummary()
+  return r.ok ? r.summary : EMPTY
+}
+
+/** Works for team members too. null = unknown (offline or error). */
+export async function getKycStatus(_alias?: string): Promise<KycStatus | null> {
+  try {
+    return (await api<{ status: KycStatus }>("/kyc/status")).status
+  } catch {
+    return null
+  }
+}
+
+/* ------------------------------------------------------------------ submit */
+
+type UploadSlot = { documentId: string; url: string; fields: Record<string, string>; maxBytes: number }
+const uploaded = new WeakMap<File, string>() // a retry after a failed submit doesn't upload the same file twice
+
+async function uploadFile(kind: DocKind, file: File): Promise<string> {
+  const known = uploaded.get(file)
+  if (known) return known
+
+  const slot = await api<UploadSlot>("/kyc/documents", {
+    method: "POST",
+    json: { kind, contentType: file.type, size: file.size, filename: file.name },
+  })
+
+  const form = new FormData()
+  for (const [k, v] of Object.entries(slot.fields)) form.append(k, v)
+  form.append("file", file) // must come last
+
+  let res: Response
+  try {
+    res = await fetch(slot.url, { method: "POST", body: form })
+  } catch {
+    throw new ApiError(0, "NETWORK", "Gagal mengunggah dokumen. Periksa koneksi Anda.")
+  }
+  if (!res.ok) throw new ApiError(res.status, "UPLOAD_FAILED", "Gagal mengunggah dokumen. Coba lagi.")
+
+  await api(`/kyc/documents/${slot.documentId}/complete`, { method: "POST" })
+  uploaded.set(file, slot.documentId)
+  return slot.documentId
 }
 
 export async function submitKyc(
-  alias: string,
-  actor: string,
-  input: { values: KycFormValues; docs: Partial<Record<DocKind, DocMeta>> }
-): Promise<ApiResult> {
-  await sleep(600)
-  if (isProd()) return { ok: false, message: NOT_AVAILABLE }
+  values: KycFormValues,
+  files: Partial<Record<DocKind, File>>,
+): Promise<{ ok: true } | Fail> {
+  try {
+    const documents: Record<string, string> = {}
+    for (const [kind, file] of Object.entries(files) as [DocKind, File | undefined][]) {
+      if (file) documents[kind] = await uploadFile(kind, file)
+    }
 
-  const parsed = kycSchema.safeParse(input.values)
-  if (!parsed.success) return { ok: false, message: "Data tidak valid. Periksa kembali isian Anda." }
-  const v = parsed.data
+    const body =
+      values.type === "individual"
+        ? { type: "individual", fullName: values.fullName, nik: values.nik, npwp: values.npwp || undefined, consent: true, documents }
+        : {
+            type: "business",
+            entityType: values.entityType,
+            legalName: values.legalName,
+            nib: values.nib,
+            npwp: values.npwp,
+            repName: values.repName,
+            repNik: values.repNik,
+            consent: true,
+            documents,
+          }
 
-  const prev = read()[alias]
-  if (prev?.status === "in_review") {
-    return { ok: false, message: "Pengajuan sebelumnya masih ditinjau." }
+    await api("/kyc/submissions", { method: "POST", json: body })
+    emit()
+    return { ok: true }
+  } catch (e) {
+    return toFail(e)
   }
+}
 
-  const docs: Partial<Record<DocKind, DocMeta>> = {}
-  for (const { kind, required } of DOCS_BY_TYPE[v.type]) {
-    const meta = input.docs[kind]
-    if (meta) docs[kind] = meta
-    else if (required) return { ok: false, message: `${DOC_SPECS[kind].label} wajib diunggah.` }
+/* --------------------------------------------------- sensitive reads (owner) */
+
+export async function stepUp(password: string): Promise<{ ok: true } | Fail> {
+  try {
+    await api("/auth/step-up", { method: "POST", json: { password } })
+    return { ok: true }
+  } catch (e) {
+    return toFail(e)
   }
-
-  const data: Stored["data"] =
-    v.type === "individual"
-      ? { fullName: v.fullName, nik: v.nik, npwp: v.npwp, entityType: "", legalName: "", nib: "", repName: "", repNik: "" }
-      : { fullName: "", nik: "", npwp: v.npwp, entityType: v.entityType, legalName: v.legalName, nib: v.nib, repName: v.repName, repNik: v.repNik }
-
-  // A real server keeps the previous verified record in force until the new one passes review.
-  save(alias, { status: "in_review", type: v.type, data, docs, submittedAt: new Date().toISOString() })
-  logEvent(alias, actor, "kyc_submitted", v.type === "business" ? "Badan usaha" : "Perorangan")
-  return { ok: true, data: undefined }
 }
 
-/** Step-up check before showing sensitive data. The mock accepts any non-empty password. */
-export async function stepUp(password: string): Promise<boolean> {
-  await sleep(300)
-  return password.length > 0
+/** Throws ApiError. A STEP_UP_REQUIRED code means: ask for the password, then retry. */
+export async function revealIdentity(field: IdField): Promise<string> {
+  return (await api<{ value: string }>("/kyc/reveal", { method: "POST", json: { field } })).value
 }
 
-export async function revealIdentity(
-  alias: string,
-  actor: string,
-  field: IdField
-): Promise<ApiResult<string>> {
-  await sleep(250)
-  if (isProd()) return { ok: false, message: NOT_AVAILABLE }
-  // A real server also checks the caller's identity:reveal permission and rate-limits this.
-  const value = read()[alias]?.data[field]
-  if (!value) return { ok: false, message: "Data tidak ditemukan." }
-  logEvent(alias, actor, "identity_revealed", ID_LABEL[field]) // logs the field, never the value
-  return { ok: true, data: value }
+export async function viewDocument(id: string): Promise<{ url: string; contentType: string; expiresInSeconds: number }> {
+  return api(`/kyc/documents/${id}/view`, { method: "POST" })
 }
 
-export async function openDocument(
-  alias: string,
-  actor: string,
-  kind: DocKind
-): Promise<ApiResult<DocMeta>> {
-  await sleep(250)
-  if (isProd()) return { ok: false, message: NOT_AVAILABLE }
-  const meta = read()[alias]?.docs[kind]
-  if (!meta) return { ok: false, message: "Dokumen tidak ditemukan." }
-  logEvent(alias, actor, "document_viewed", DOC_SPECS[kind].label)
-  return { ok: true, data: meta }
-}
-
-/** DEV ONLY: stands in for the verification provider's result */
-export async function simulateDecision(
-  alias: string,
-  decision: "verified" | "rejected"
-): Promise<ApiResult> {
-  await sleep(400)
-  if (isProd()) return { ok: false, message: NOT_AVAILABLE }
-  const rec = read()[alias]
-  if (!rec || rec.status !== "in_review") return { ok: false, message: "Tidak ada pengajuan yang ditinjau." }
-
-  const decidedAt = new Date().toISOString()
-  save(
-    alias,
-    decision === "verified"
-      ? { ...rec, status: "verified", decidedAt, rejectionReason: undefined }
-      : { ...rec, status: "rejected", decidedAt, rejectionReason: "Foto dokumen tidak terbaca jelas. Unggah ulang dengan pencahayaan yang lebih baik." }
-  )
-  logEvent(alias, "Sistem verifikasi (simulasi)", decision === "verified" ? "kyc_approved" : "kyc_rejected")
-  kycDecided(alias, decision)
-  return { ok: true, data: undefined }
+/** DEV ONLY: the mock provider's verdict, delivered through the real signed-webhook path */
+export async function simulateDecision(decision: "verified" | "rejected"): Promise<{ ok: true } | Fail> {
+  try {
+    await api("/dev/kyc/decide", { method: "POST", json: { decision } })
+    emit()
+    return { ok: true }
+  } catch (e) {
+    return toFail(e)
+  }
 }

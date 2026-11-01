@@ -3,7 +3,7 @@ import { approvalsStore } from "./approvals-store"
 import { logEvent } from "./audit"
 import { BANKS, maskBank, normalizeHolder, type BankSummary } from "./bank"
 import { formatIDR } from "./format"
-import { getKycSummary } from "./kyc-api"
+import { getKycStatus, getKycSummary } from "./kyc-api"
 import { bankChanged, approvalRequested, withdrawalProcessed, withdrawalSettled } from "./notify-events"
 import type { ApiResult } from "./team-api"
 import { teamStore } from "./team-store"
@@ -172,8 +172,9 @@ export async function requestWithdrawal(
     }
   }
 
-  const kyc = await getKycSummary(actor.alias)
-  if (kyc.status !== "verified") return { ok: false, message: "Identitas akun belum terverifikasi." }
+  if ((await getKycStatus(actor.alias)) !== "verified") {
+    return { ok: false, message: "Identitas akun belum terverifikasi." }
+  }
 
   const bank = walletStore.bank(actor.alias, input.bankAccountId)
   if (!bank) return { ok: false, message: "Rekening tujuan tidak ditemukan." }

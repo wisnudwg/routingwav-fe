@@ -6,13 +6,7 @@ import { PasswordInput } from "@/components/auth/password-input"
 import { stepUp } from "@/lib/kyc-api"
 import { markElevated } from "@/lib/step-up"
 
-export function StepUpPrompt({
-  onConfirmed,
-  onCancel,
-}: {
-  onConfirmed: () => void
-  onCancel: () => void
-}) {
+export function StepUpPrompt({ onConfirmed, onCancel }: { onConfirmed: () => void; onCancel: () => void }) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -21,9 +15,9 @@ export function StepUpPrompt({
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const ok = await stepUp(password)
+    const res = await stepUp(password)
     setBusy(false)
-    if (!ok) return setError("Password salah.")
+    if (!res.ok) return setError(res.message)
     markElevated()
     setPassword("")
     onConfirmed()
@@ -43,7 +37,7 @@ export function StepUpPrompt({
       />
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={busy}>Konfirmasi</Button>
+        <Button type="submit" size="sm" disabled={busy || !password}>Konfirmasi</Button>
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Batal</Button>
       </div>
     </form>
